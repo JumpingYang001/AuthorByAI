@@ -94,28 +94,147 @@ class ChatRobotPanel {
     }
 
     private async _getAIResponse(userMessage: string): Promise<string> {
-        // Method 1: Try GitHub Copilot Chat API (if available)
+        // Option 1: Try OpenAI API first
         try {
-            await vscode.commands.executeCommand('github.copilot.generate', {
-                prompt: `You are a helpful coding assistant. The user said: "${userMessage}". Respond helpfully and concisely.`
+            return await this._callOpenAI(userMessage);
+        } catch (error) {
+            console.log('OpenAI failed, trying other options:', error);
+        }
+
+        // Option 2: Try local AI models (if available)
+        try {
+            return await this._callLocalAI(userMessage);
+        } catch (error) {
+            console.log('Local AI failed:', error);
+        }
+
+        // Option 3: Try other AI services
+        try {
+            return await this._callClaudeAPI(userMessage);
+        } catch (error) {
+            console.log('Claude failed:', error);
+        }
+
+        // If all AI options fail, throw error to use smart fallback
+        throw new Error('All AI services unavailable');
+    }
+
+    // OpenAI API integration
+    private async _callOpenAI(userMessage: string): Promise<string> {
+        // To enable this, you need to:
+        // 1. npm install axios
+        // 2. Get OpenAI API key from https://platform.openai.com/
+        // 3. Set environment variable: OPENAI_API_KEY=your_key_here
+        
+        const apiKey = process.env.OPENAI_API_KEY;
+        if (!apiKey) {
+            throw new Error('OpenAI API key not configured');
+        }
+
+        try {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'gpt-3.5-turbo',
+                    messages: [
+                        {
+                            role: 'system',
+                            content: 'You are a helpful coding assistant integrated into VS Code. Keep responses concise and practical.'
+                        },
+                        {
+                            role: 'user',
+                            content: userMessage
+                        }
+                    ],
+                    max_tokens: 150,
+                    temperature: 0.7
+                })
             });
-        } catch (error) {
-            console.log('GitHub Copilot not available:', error);
-        }
 
-        // Method 2: Use external AI API (OpenAI, Anthropic, etc.)
-        // Uncomment and configure this section to use external APIs
-        /*
+            if (!response.ok) {
+                throw new Error(`OpenAI API error: ${response.status}`);
+            }
+
+            const data = await response.json() as any;
+            return data.choices?.[0]?.message?.content || 'No response from OpenAI';
+            
+        } catch (error) {
+            console.log('OpenAI API error:', error);
+            throw error;
+        }
+    }
+
+    // Local AI integration (Ollama, LM Studio, etc.)
+    private async _callLocalAI(userMessage: string): Promise<string> {
         try {
-            const response = await this._callExternalAI(userMessage);
-            return response;
-        } catch (error) {
-            console.log('External AI API error:', error);
-        }
-        */
+            // Example: Ollama running locally on port 11434
+            const response = await fetch('http://localhost:11434/api/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'llama2', // or 'codellama', 'mistral', etc.
+                    prompt: `You are a helpful coding assistant. User question: ${userMessage}\n\nResponse:`,
+                    stream: false
+                })
+            });
 
-        // Method 3: Fallback to enhanced pattern matching
-        throw new Error('AI services not available');
+            if (!response.ok) {
+                throw new Error(`Local AI error: ${response.status}`);
+            }
+
+            const data = await response.json() as any;
+            return data.response || 'No response from local AI';
+            
+        } catch (error) {
+            console.log('Local AI error:', error);
+            throw error;
+        }
+    }
+
+    // Anthropic Claude API integration
+    private async _callClaudeAPI(userMessage: string): Promise<string> {
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) {
+            throw new Error('Anthropic API key not configured');
+        }
+
+        try {
+            const response = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json',
+                    'anthropic-version': '2023-06-01'
+                },
+                body: JSON.stringify({
+                    model: 'claude-3-haiku-20240307',
+                    max_tokens: 150,
+                    messages: [
+                        {
+                            role: 'user',
+                            content: `You are a helpful coding assistant in VS Code. ${userMessage}`
+                        }
+                    ]
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Claude API error: ${response.status}`);
+            }
+
+            const data = await response.json() as any;
+            return data.content?.[0]?.text || 'No response from Claude';
+            
+        } catch (error) {
+            console.log('Claude API error:', error);
+            throw error;
+        }
     }
 
     private _getSmartFallbackResponse(userMessage: string): string {
@@ -429,7 +548,29 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.window.showInformationMessage('Hello World from Chat Robot! Use "Open Chat Robot" to start chatting.');
 	});
 
-	context.subscriptions.push(chatCommand, helloCommand);
+	// Register command to list available commands (for debugging)
+	const listCommandsCommand = vscode.commands.registerCommand('Author-AI-Assistant.listCommands', async () => {
+		try {
+			const allCommands = await vscode.commands.getCommands();
+			const copilotCommands = allCommands.filter(cmd => 
+				cmd.toLowerCase().includes('copilot') || cmd.toLowerCase().includes('github')
+			);
+			
+			console.log('All Copilot/GitHub commands:', copilotCommands);
+			
+			if (copilotCommands.length > 0) {
+				vscode.window.showInformationMessage(
+					`Found ${copilotCommands.length} Copilot/GitHub commands. Check console for list.`
+				);
+			} else {
+				vscode.window.showWarningMessage('No Copilot/GitHub commands found. Is Copilot installed?');
+			}
+		} catch (error) {
+			vscode.window.showErrorMessage('Failed to list commands');
+		}
+	});
+
+	context.subscriptions.push(chatCommand, helloCommand, listCommandsCommand);
 }
 
 // This method is called when your extension is deactivated

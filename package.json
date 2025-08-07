@@ -27,6 +27,11 @@
         "command": "Author-AI-Assistant.openChat",
         "title": "Open Chat Robot",
         "category": "Chat Robot"
+      },
+      {
+        "command": "Author-AI-Assistant.listCommands",
+        "title": "List Copilot Commands (Debug)",
+        "category": "Chat Robot"
       }
     ]
   },
