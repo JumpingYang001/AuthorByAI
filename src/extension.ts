@@ -61,27 +61,159 @@ class ChatRobotPanel {
         );
     }
 
-    private _handleUserMessage(userMessage: string) {
-        // Simple bot responses
-        const responses = [
-            "Hello! I'm your friendly chat robot. How can I help you today?",
-            "That's interesting! Tell me more about that.",
-            "I understand. Is there anything specific you'd like to know?",
-            "Thanks for sharing! I'm here to help with any questions.",
-            "Great question! Let me think about that...",
-            "I appreciate you talking with me. What else is on your mind?",
-            "That sounds important. Would you like to discuss it further?",
-            "Interesting perspective! I'd love to hear more of your thoughts."
-        ];
+    private async _handleUserMessage(userMessage: string) {
+        try {
+            // Show typing indicator
+            this._panel.webview.postMessage({
+                command: 'addMessage',
+                sender: 'bot',
+                text: '🤖 Thinking...'
+            });
 
-        const botResponse = responses[Math.floor(Math.random() * responses.length)];
+            // Try to get AI response using various methods
+            const aiResponse = await this._getAIResponse(userMessage);
+            
+            // Remove thinking message and send actual response
+            this._panel.webview.postMessage({
+                command: 'replaceLastMessage',
+                sender: 'bot',
+                text: aiResponse
+            });
+        } catch (error) {
+            console.log('AI not available, using fallback responses:', error);
+            
+            // Enhanced fallback responses based on user input
+            const smartResponse = this._getSmartFallbackResponse(userMessage);
+            
+            this._panel.webview.postMessage({
+                command: 'replaceLastMessage',
+                sender: 'bot',
+                text: smartResponse
+            });
+        }
+    }
+
+    private async _getAIResponse(userMessage: string): Promise<string> {
+        // Method 1: Try GitHub Copilot Chat API (if available)
+        try {
+            await vscode.commands.executeCommand('github.copilot.generate', {
+                prompt: `You are a helpful coding assistant. The user said: "${userMessage}". Respond helpfully and concisely.`
+            });
+        } catch (error) {
+            console.log('GitHub Copilot not available:', error);
+        }
+
+        // Method 2: Use external AI API (OpenAI, Anthropic, etc.)
+        // Uncomment and configure this section to use external APIs
+        /*
+        try {
+            const response = await this._callExternalAI(userMessage);
+            return response;
+        } catch (error) {
+            console.log('External AI API error:', error);
+        }
+        */
+
+        // Method 3: Fallback to enhanced pattern matching
+        throw new Error('AI services not available');
+    }
+
+    private _getSmartFallbackResponse(userMessage: string): string {
+        const lowerMessage = userMessage.toLowerCase();
         
-        // Send response back to webview
-        this._panel.webview.postMessage({
-            command: 'addMessage',
-            sender: 'bot',
-            text: botResponse
+        // Code-related keywords
+        if (lowerMessage.includes('code') || lowerMessage.includes('function') || 
+            lowerMessage.includes('variable') || lowerMessage.includes('debug')) {
+            const codeResponses = [
+                "I'd be happy to help with your code! Can you share more details about what you're working on?",
+                "That sounds like a coding challenge. What programming language are you using?",
+                "For debugging, I recommend checking the VS Code terminal and console for error messages. What specific issue are you facing?",
+                "Code organization is important! Are you looking for help with structure, syntax, or logic?"
+            ];
+            return codeResponses[Math.floor(Math.random() * codeResponses.length)];
+        }
+        
+        // VS Code related keywords
+        if (lowerMessage.includes('vscode') || lowerMessage.includes('extension') || 
+            lowerMessage.includes('editor') || lowerMessage.includes('workspace')) {
+            const vscodeResponses = [
+                "VS Code is amazing! What feature or extension are you curious about?",
+                "I can help with VS Code tips! Try pressing Ctrl+Shift+P to open the command palette.",
+                "Extensions make VS Code powerful. Check out the Extensions marketplace for useful tools!",
+                "VS Code has great debugging capabilities. Have you tried setting breakpoints in your code?"
+            ];
+            return vscodeResponses[Math.floor(Math.random() * vscodeResponses.length)];
+        }
+        
+        // Question keywords
+        if (lowerMessage.includes('how') || lowerMessage.includes('what') || 
+            lowerMessage.includes('why') || lowerMessage.includes('?')) {
+            const helpResponses = [
+                "Great question! I'm here to help. Can you provide more context about what you need?",
+                "I'd love to help you figure that out! What specifically are you trying to achieve?",
+                "That's an interesting question. Let me know more details and I'll do my best to assist!",
+                "Questions are wonderful for learning! What area would you like to explore?"
+            ];
+            return helpResponses[Math.floor(Math.random() * helpResponses.length)];
+        }
+        
+        // Greeting keywords
+        if (lowerMessage.includes('hello') || lowerMessage.includes('hi') || 
+            lowerMessage.includes('hey') || lowerMessage.includes('good')) {
+            const greetingResponses = [
+                "Hello! 👋 I'm your coding companion. What can I help you with today?",
+                "Hi there! Ready to tackle some coding challenges together?",
+                "Hey! Great to see you. What programming adventure are we going on today?",
+                "Good to meet you! I'm here to help with any coding questions or VS Code tips you need."
+            ];
+            return greetingResponses[Math.floor(Math.random() * greetingResponses.length)];
+        }
+        
+        // Default responses
+        const defaultResponses = [
+            "That's interesting! Tell me more about what you're working on.",
+            "I'm here to help! What specific challenge are you facing?",
+            "Thanks for sharing! How can I assist you with your development work?",
+            "I'd love to help you with that. Can you provide more details?",
+            "Interesting! Are you looking for coding help, VS Code tips, or something else?"
+        ];
+        
+        return defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
+    }
+
+    // Optional: External AI API integration
+    private async _callExternalAI(userMessage: string): Promise<string> {
+        // Example for OpenAI API integration
+        // You would need to install axios: npm install axios
+        // And set up API keys securely
+        
+        /*
+        const axios = require('axios');
+        
+        const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+            model: 'gpt-3.5-turbo',
+            messages: [
+                {
+                    role: 'system',
+                    content: 'You are a helpful coding assistant integrated into VS Code.'
+                },
+                {
+                    role: 'user',
+                    content: userMessage
+                }
+            ],
+            max_tokens: 150
+        }, {
+            headers: {
+                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+                'Content-Type': 'application/json'
+            }
         });
+        
+        return response.data.choices[0].message.content;
+        */
+        
+        throw new Error('External AI not configured');
     }
 
     public dispose() {
@@ -261,6 +393,13 @@ class ChatRobotPanel {
             const message = event.data;
             if (message.command === 'addMessage') {
                 addMessage(message.sender, message.text);
+            } else if (message.command === 'replaceLastMessage') {
+                // Replace the last bot message (for updating "thinking..." to actual response)
+                const messages = messagesContainer.querySelectorAll('.bot-message');
+                if (messages.length > 0) {
+                    const lastBotMessage = messages[messages.length - 1];
+                    lastBotMessage.innerHTML = \`<strong>Bot:</strong> \${message.text}\`;
+                }
             }
         });
 
