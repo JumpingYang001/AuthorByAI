@@ -107,7 +107,7 @@ const models = await vscode.lm.selectChatModels({
 
 2. **Install Dependencies:**
    ```bash
-   cd "d:\AIAuthorEditor"
+   cd "d:\AuthorByAI"
    npm install axios
    ```
 

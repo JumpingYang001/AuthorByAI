@@ -15,7 +15,7 @@
 - Project Type: VS Code Extension
 - Language: TypeScript
 - Purpose: Simple chat robot functionality with webview interface
-- Target Directory: D:\AIAuthorEditor
+- Target Directory: D:\AuthorByAI
 
 ## Customizations Added
 - Chat robot class with webview panel

@@ -43,7 +43,7 @@ A simple and friendly chat robot extension for Visual Studio Code that provides 
 
 1. **Navigate to the project directory**:
    ```bash
-   cd d:\AIAuthorEditor
+   cd d:\AuthorByAI
    ```
 
 2. **Install dependencies**:
