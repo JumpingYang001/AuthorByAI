@@ -1,7 +1,7 @@
 {
-  "name": "Author-AI-Assistant",
-  "displayName": "Chat Robot",
-  "description": "A simple chat robot VS Code extension",
+  "name": "book-writing-assistant",
+  "displayName": "Book Writing Assistant",
+  "description": "A VS Code extension for generating educational content and training materials in markdown format",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.102.0"
@@ -25,13 +25,18 @@
       },
       {
         "command": "Author-AI-Assistant.openChat",
-        "title": "Open Chat Robot",
-        "category": "Chat Robot"
+        "title": "Open Book Writing Assistant",
+        "category": "Book Writing"
       },
       {
-        "command": "Author-AI-Assistant.listCommands",
-        "title": "List Copilot Commands (Debug)",
-        "category": "Chat Robot"
+        "command": "Author-AI-Assistant.openBookWriting",
+        "title": "Open Book Writing Assistant",
+        "category": "Book Writing"
+      },
+      {
+        "command": "Author-AI-Assistant.createBookStructure",
+        "title": "Create Book Structure",
+        "category": "Book Writing"
       }
     ]
   },
