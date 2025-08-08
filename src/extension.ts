@@ -582,8 +582,14 @@ class BookWritingContentProvider implements vscode.WebviewViewProvider {
         webviewView.webview.onDidReceiveMessage(async (data) => {
             switch (data.command) {
                 case 'generateContent':
-                    // Open the main panel for content generation
+                    // Open the main panel for content generation with pre-selected type
                     vscode.commands.executeCommand('Author-AI-Assistant.openBookWriting');
+                    // Wait a moment for the panel to load, then set the content type
+                    setTimeout(() => {
+                        if (BookWritingPanel.currentPanel) {
+                            BookWritingPanel.currentPanel.setContentType(data.type);
+                        }
+                    }, 100);
                     break;
                 case 'openMainPanel':
                     vscode.commands.executeCommand('Author-AI-Assistant.openBookWriting');
@@ -830,6 +836,14 @@ class BookWritingPanel {
     
     private _getContextSummary(): string {
         return this._contextManager.getContextSummary();
+    }
+
+    // Method to set content type from sidebar
+    public setContentType(contentType: string) {
+        this._panel.webview.postMessage({
+            command: 'setContentType',
+            contentType: contentType
+        });
     }
 
     private async _handleContentGeneration(type: string, topic: string, domain: string) {
@@ -2240,6 +2254,16 @@ Key steps or code snippets
                     if (messages.length > 0) {
                         const lastMessage = messages[messages.length - 1];
                         lastMessage.innerHTML = \`<strong>Assistant:</strong> \${message.text}\`;
+                    }
+                    break;
+                    
+                case 'setContentType':
+                    // Set the content type dropdown when called from sidebar
+                    const contentTypeSelect = document.getElementById('contentType');
+                    if (contentTypeSelect) {
+                        contentTypeSelect.value = message.contentType;
+                        // Also update the display to show the selected type
+                        contentTypeSelect.dispatchEvent(new Event('change'));
                     }
                     break;
             }
