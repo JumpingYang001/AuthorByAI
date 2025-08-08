@@ -184,7 +184,26 @@ class BookWritingPanel {
 
     // Content Generation Methods
     private async _generateChapterOutline(topic: string, domain: string): Promise<string> {
-        const prompt = `Create a detailed chapter outline for a book about "${topic}" in the ${domain} domain. Include learning objectives, main sections, and key points.`;
+        const prompt = `You are a professional educational content writer. Create a detailed chapter outline for a book about "${topic}" in the ${domain} domain.
+
+REQUIRED FORMAT:
+- Use markdown formatting
+- Include a main title with # Chapter Outline: ${topic}
+- Add a domain section with ## Domain: ${domain}
+- Create structured sections with clear headings and bullet points
+
+MUST INCLUDE:
+1. Learning Objectives (3-5 specific, measurable goals)
+2. Chapter Structure with 6 main sections:
+   - Introduction (what, why, overview)
+   - Core Concepts (terminology, principles, how it works)
+   - Practical Applications (examples, use cases, implementations)
+   - Best Practices (dos/don'ts, recommendations)
+   - Advanced Topics (complex scenarios, integrations)
+   - Summary and Next Steps (takeaways, actions, resources)
+3. Assessment section (questions, exercises, projects)
+
+Make it comprehensive, pedagogically sound, and suitable for educational use.`;
         
         try {
             return await this._getAIResponse(prompt);
@@ -194,7 +213,30 @@ class BookWritingPanel {
     }
 
     private async _generateLessonContent(topic: string, domain: string): Promise<string> {
-        const prompt = `Write a comprehensive lesson about "${topic}" in the ${domain} domain. Include explanations, examples, and practical applications. Format in markdown.`;
+        const prompt = `You are a professional educational content writer. Write a comprehensive lesson about "${topic}" in the ${domain} domain.
+
+REQUIRED FORMAT:
+- Use markdown formatting with proper headings, code blocks, and lists
+- Include a main title with # Lesson: ${topic}
+- Structure content with clear sections and subsections
+
+MUST INCLUDE:
+1. Introduction (welcome, learning goals, overview)
+2. What You'll Learn (4-5 bullet points of specific outcomes)
+3. Core Concepts section with:
+   - Clear definition of ${topic}
+   - Key components/principles (numbered list)
+4. Practical Examples section with:
+   - Basic implementation example (with code or steps)
+   - Advanced usage example
+5. Best Practices section with:
+   - Do's and Don'ts
+   - Professional tips
+6. Common Challenges section (problems, solutions, prevention)
+7. Summary (what was covered)
+8. Next Steps (actionable items for learners)
+
+Use concrete examples relevant to ${domain}. Include code snippets where appropriate. Make it engaging and practical for learners.`;
         
         try {
             return await this._getAIResponse(prompt);
@@ -204,7 +246,32 @@ class BookWritingPanel {
     }
 
     private async _generateExercise(topic: string, domain: string): Promise<string> {
-        const prompt = `Create practical exercises and hands-on activities for learning "${topic}" in the ${domain} domain. Include step-by-step instructions and expected outcomes.`;
+        const prompt = `You are a professional educational content writer. Create practical exercises and hands-on activities for learning "${topic}" in the ${domain} domain.
+
+REQUIRED FORMAT:
+- Use markdown formatting
+- Include a main title with # Exercises: ${topic}
+- Add domain section with ## Domain: ${domain}
+
+MUST INCLUDE:
+1. Exercise 1: Basic Understanding
+   - Clear objective
+   - Step-by-step instructions with specific tasks
+   - Expected outcome
+2. Exercise 2: Practical Application
+   - Real-world scenario relevant to ${domain}
+   - Specific deliverables
+   - Implementation steps
+3. Exercise 3: Problem Solving
+   - Challenge scenario
+   - Troubleshooting steps
+   - Validation methods
+4. Self-Assessment section with:
+   - Rating scale checkboxes for different skills
+   - Reflection questions
+5. Additional Practice suggestions
+
+Make exercises progressively challenging. Include specific, actionable tasks that learners can complete. Ensure exercises are practical and relevant to ${domain} professionals.`;
         
         try {
             return await this._getAIResponse(prompt);
@@ -214,7 +281,32 @@ class BookWritingPanel {
     }
 
     private async _generateQuiz(topic: string, domain: string): Promise<string> {
-        const prompt = `Create a comprehensive quiz with multiple choice, true/false, and short answer questions about "${topic}" in the ${domain} domain. Include answer key.`;
+        const prompt = `You are a professional educational content writer. Create a comprehensive quiz about "${topic}" in the ${domain} domain.
+
+REQUIRED FORMAT:
+- Use markdown formatting
+- Include a main title with # Quiz: ${topic}
+- Add domain section with ## Domain: ${domain}
+
+MUST INCLUDE:
+1. Instructions section (how to use the quiz)
+2. Multiple Choice Questions (2 questions minimum):
+   - 4 options each (A, B, C, D)
+   - Questions specific to ${topic} in ${domain} context
+3. True/False Questions (2 questions minimum):
+   - Clear statements about ${topic}
+4. Short Answer Questions (2 questions minimum):
+   - Open-ended questions requiring explanation
+   - Space for written responses
+5. Practical Questions (1 question minimum):
+   - Scenario-based application questions
+6. Complete Answer Key section with:
+   - Correct answers for all questions
+   - Explanations for why answers are correct
+   - Sample responses for short answer questions
+   - Evaluation criteria for practical questions
+
+Make questions challenging but fair. Ensure they test understanding, application, and critical thinking about ${topic} in ${domain} context.`;
         
         try {
             return await this._getAIResponse(prompt);
@@ -224,7 +316,42 @@ class BookWritingPanel {
     }
 
     private async _generateSummary(topic: string, domain: string): Promise<string> {
-        const prompt = `Write a concise summary of key concepts and takeaways for "${topic}" in the ${domain} domain. Include main points, important terms, and actionable insights.`;
+        const prompt = `You are a professional educational content writer. Write a concise but comprehensive summary of "${topic}" in the ${domain} domain.
+
+REQUIRED FORMAT:
+- Use markdown formatting with proper headings and tables
+- Include a main title with # Summary: ${topic}
+- Add domain section with ## Domain: ${domain}
+
+MUST INCLUDE:
+1. Key Concepts section with:
+   - Main definition of ${topic}
+   - 3-4 core principles with brief explanations
+2. Important Terms table with:
+   - Key terminology and definitions
+   - At least 3 important terms
+3. Practical Applications section:
+   - 3 real-world use cases
+   - Benefits and considerations for each
+4. Best Practices Checklist:
+   - Do's and Don'ts in checklist format
+   - Professional recommendations
+5. Common Pitfalls section:
+   - 3 common mistakes to avoid
+   - How to prevent them
+6. Action Items section with:
+   - Immediate next steps (checkboxes)
+   - Short-term goals (1-2 weeks)
+   - Long-term development (1+ months)
+7. Further Learning section:
+   - Recommended resources
+   - Books, courses, documentation
+8. Quick Reference section:
+   - Essential commands or steps
+   - Code snippets if applicable
+9. Reflection Questions (3 questions)
+
+Make it a comprehensive reference that learners can return to. Focus on practical, actionable information relevant to ${domain} professionals.`;
         
         try {
             return await this._getAIResponse(prompt);
@@ -235,7 +362,20 @@ class BookWritingPanel {
 
     // AI Integration Methods
     private async _getBookWritingResponse(userMessage: string): Promise<string> {
-        const enhancedPrompt = `You are a professional book writing assistant specializing in creating educational and training content. Help with: ${userMessage}`;
+        const enhancedPrompt = `You are a professional book writing assistant specializing in creating educational and training content. You help authors create structured learning materials including:
+
+CONTENT TYPES YOU GENERATE:
+1. CHAPTER OUTLINES - Structured learning plans with objectives, sections (Introduction, Core Concepts, Practical Applications, Best Practices, Advanced Topics, Summary), and assessments
+2. LESSON CONTENT - Comprehensive educational lessons with definitions, examples, best practices, common challenges, and next steps
+3. EXERCISES - Hands-on activities with basic understanding, practical application, and problem-solving tasks plus self-assessment
+4. QUIZZES - Complete assessments with multiple choice, true/false, short answer, and practical questions plus full answer keys
+5. SUMMARIES - Comprehensive reviews with key concepts, terminology tables, best practices checklists, action items, and reflection questions
+
+CONTEXT: The user is working on educational content creation using our Book Writing Assistant VS Code extension. They can generate markdown files for any topic in various domains (Technology, Business, Science, Health, Education, Arts, etc.).
+
+USER QUESTION: ${userMessage}
+
+Please provide helpful, specific advice about book writing, content structure, pedagogical approaches, or how to use the content generation features effectively. If they're asking about a specific topic, help them understand how to structure it for learning.`;
         return await this._getAIResponse(enhancedPrompt);
     }
 
@@ -281,14 +421,38 @@ class BookWritingPanel {
                     messages: [
                         {
                             role: 'system',
-                            content: 'You are a professional book writing assistant. Create high-quality educational content in markdown format. Be detailed, structured, and pedagogically sound.'
+                            content: `You are a professional book writing assistant specializing in educational content creation. You create high-quality learning materials in markdown format that are:
+
+CHARACTERISTICS:
+- Detailed and comprehensive
+- Pedagogically sound with clear learning progression
+- Professionally structured with consistent formatting
+- Practical and applicable to real-world scenarios
+- Engaging and accessible to learners
+
+MARKDOWN REQUIREMENTS:
+- Use proper heading hierarchy (# ## ### ####)
+- Include code blocks with \`\`\` when showing examples
+- Use bullet points and numbered lists for clarity
+- Include tables for terminology and comparisons
+- Use checkboxes [ ] for action items and assessments
+- Apply bold **text** and italic *text* for emphasis
+
+CONTENT STANDARDS:
+- Always include specific, measurable learning objectives
+- Provide concrete examples relevant to the domain
+- Include practical exercises and assessments
+- Offer clear next steps and further learning resources
+- Maintain professional tone while being accessible
+
+Follow the exact format specifications provided in the user prompt.`
                         },
                         {
                             role: 'user',
                             content: prompt
                         }
                     ],
-                    max_tokens: 2000,
+                    max_tokens: 3000,
                     temperature: 0.7
                 })
             });
@@ -309,6 +473,8 @@ class BookWritingPanel {
     // Local AI integration (Ollama)
     private async _callLocalAI(prompt: string): Promise<string> {
         try {
+            const systemPrompt = `You are a professional book writing assistant specializing in educational content. Create structured, pedagogically sound learning materials in markdown format. Follow format specifications exactly and include practical examples, clear explanations, and actionable content.`;
+            
             const response = await fetch('http://localhost:11434/api/generate', {
                 method: 'POST',
                 headers: {
@@ -316,7 +482,7 @@ class BookWritingPanel {
                 },
                 body: JSON.stringify({
                     model: 'llama2',
-                    prompt: `You are a professional book writing assistant. ${prompt}\n\nResponse:`,
+                    prompt: `${systemPrompt}\n\nUser Request: ${prompt}\n\nResponse:`,
                     stream: false
                 })
             });
@@ -351,11 +517,29 @@ class BookWritingPanel {
                 },
                 body: JSON.stringify({
                     model: 'claude-3-sonnet-20240229',
-                    max_tokens: 2000,
+                    max_tokens: 3000,
                     messages: [
                         {
                             role: 'user',
-                            content: `You are a professional book writing assistant specializing in educational content. ${prompt}`
+                            content: `You are a professional book writing assistant specializing in educational content creation. You excel at creating structured learning materials that are pedagogically sound, professionally formatted in markdown, and highly practical for learners.
+
+EXPERTISE AREAS:
+- Educational content design and structure
+- Learning objective creation
+- Practical exercise development
+- Assessment and quiz creation
+- Technical writing and documentation
+- Cross-domain knowledge application
+
+QUALITY STANDARDS:
+- Follow exact format specifications
+- Include specific, actionable content
+- Provide relevant examples for the domain
+- Maintain consistent professional tone
+- Use proper markdown formatting
+- Include comprehensive coverage of topics
+
+${prompt}`
                         }
                     ]
                 })
