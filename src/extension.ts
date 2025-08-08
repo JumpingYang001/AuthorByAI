@@ -12,6 +12,29 @@ class BookWritingPanel {
     private readonly _panel: vscode.WebviewPanel;
     private readonly _extensionUri: vscode.Uri;
     private _disposables: vscode.Disposable[] = [];
+    
+    // Context tracking for AI awareness
+    private _sessionContext: {
+        recentActivities: Array<{
+            timestamp: Date;
+            action: 'content_generation' | 'file_creation' | 'chat';
+            details: string;
+            type?: string;
+            topic?: string;
+            domain?: string;
+            filename?: string;
+        }>;
+        currentProject: {
+            mainTopic?: string;
+            domain?: string;
+            generatedFiles: string[];
+        };
+    } = {
+        recentActivities: [],
+        currentProject: {
+            generatedFiles: []
+        }
+    };
 
     public static createOrShow(extensionUri: vscode.Uri) {
         const column = vscode.window.activeTextEditor
@@ -68,8 +91,57 @@ class BookWritingPanel {
         );
     }
 
+    // Context Management Methods
+    private _addToContext(action: 'content_generation' | 'file_creation' | 'chat', details: string, metadata?: any) {
+        this._sessionContext.recentActivities.push({
+            timestamp: new Date(),
+            action,
+            details,
+            ...metadata
+        });
+        
+        // Keep only last 10 activities to prevent memory issues
+        if (this._sessionContext.recentActivities.length > 10) {
+            this._sessionContext.recentActivities = this._sessionContext.recentActivities.slice(-10);
+        }
+    }
+    
+    private _getContextSummary(): string {
+        const recent = this._sessionContext.recentActivities.slice(-5); // Last 5 activities
+        const project = this._sessionContext.currentProject;
+        
+        let contextSummary = '';
+        
+        if (project.mainTopic && project.domain) {
+            contextSummary += `CURRENT PROJECT CONTEXT:\n`;
+            contextSummary += `- Main Topic: ${project.mainTopic}\n`;
+            contextSummary += `- Domain: ${project.domain}\n`;
+            contextSummary += `- Generated Files: ${project.generatedFiles.length > 0 ? project.generatedFiles.join(', ') : 'None yet'}\n\n`;
+        }
+        
+        if (recent.length > 0) {
+            contextSummary += `RECENT ACTIVITIES:\n`;
+            recent.forEach((activity, index) => {
+                const timeAgo = Math.round((Date.now() - activity.timestamp.getTime()) / 60000); // minutes ago
+                contextSummary += `${index + 1}. ${activity.details} (${timeAgo} min ago)\n`;
+            });
+            contextSummary += '\n';
+        }
+        
+        return contextSummary;
+    }
+
     private async _handleContentGeneration(type: string, topic: string, domain: string) {
         try {
+            // Track this activity in session context
+            this._addToContext('content_generation', `Generating ${type} for "${topic}" in ${domain} domain`, {
+                type, topic, domain
+            });
+            
+            // Update current project context
+            this._sessionContext.currentProject.mainTopic = topic;
+            this._sessionContext.currentProject.domain = domain;
+
             // Show loading indicator
             this._panel.webview.postMessage({
                 command: 'showLoading',
@@ -140,6 +212,10 @@ class BookWritingPanel {
             // Write the content to file
             fs.writeFileSync(filePath, content, 'utf8');
             
+            // Track file creation in context
+            this._addToContext('file_creation', `Created file: ${filename}`, { filename });
+            this._sessionContext.currentProject.generatedFiles.push(filename);
+            
             // Open the created file
             const document = await vscode.workspace.openTextDocument(filePath);
             await vscode.window.showTextDocument(document);
@@ -153,6 +229,9 @@ class BookWritingPanel {
 
     private async _handleChatMessage(userMessage: string) {
         try {
+            // Track chat activity in context
+            this._addToContext('chat', `User asked: "${userMessage}"`);
+
             // Show typing indicator
             this._panel.webview.postMessage({
                 command: 'addChatMessage',
@@ -160,7 +239,7 @@ class BookWritingPanel {
                 text: '📝 Writing...'
             });
 
-            // Get AI response focused on book writing
+            // Get AI response with full context awareness
             const aiResponse = await this._getBookWritingResponse(userMessage);
             
             // Replace thinking message with actual response
@@ -184,7 +263,11 @@ class BookWritingPanel {
 
     // Content Generation Methods
     private async _generateChapterOutline(topic: string, domain: string): Promise<string> {
+        const contextSummary = this._getContextSummary();
+        
         const prompt = `You are a professional educational content writer. Create a detailed chapter outline for a book about "${topic}" in the ${domain} domain.
+
+${contextSummary}CONTENT REQUEST: Create a chapter outline for "${topic}" in ${domain} domain.
 
 REQUIRED FORMAT:
 - Use markdown formatting
@@ -203,7 +286,7 @@ MUST INCLUDE:
    - Summary and Next Steps (takeaways, actions, resources)
 3. Assessment section (questions, exercises, projects)
 
-Make it comprehensive, pedagogically sound, and suitable for educational use.`;
+CONTEXT AWARENESS: If this builds on previously generated content, ensure consistency and natural progression. Make it comprehensive, pedagogically sound, and suitable for educational use.`;
         
         try {
             return await this._getAIResponse(prompt);
@@ -213,7 +296,11 @@ Make it comprehensive, pedagogically sound, and suitable for educational use.`;
     }
 
     private async _generateLessonContent(topic: string, domain: string): Promise<string> {
+        const contextSummary = this._getContextSummary();
+        
         const prompt = `You are a professional educational content writer. Write a comprehensive lesson about "${topic}" in the ${domain} domain.
+
+${contextSummary}CONTENT REQUEST: Create lesson content for "${topic}" in ${domain} domain.
 
 REQUIRED FORMAT:
 - Use markdown formatting with proper headings, code blocks, and lists
@@ -236,7 +323,7 @@ MUST INCLUDE:
 7. Summary (what was covered)
 8. Next Steps (actionable items for learners)
 
-Use concrete examples relevant to ${domain}. Include code snippets where appropriate. Make it engaging and practical for learners.`;
+CONTEXT AWARENESS: If this relates to previously generated content, ensure consistency and natural progression. Use concrete examples relevant to ${domain}. Include code snippets where appropriate. Make it engaging and practical for learners.`;
         
         try {
             return await this._getAIResponse(prompt);
@@ -362,6 +449,8 @@ Make it a comprehensive reference that learners can return to. Focus on practica
 
     // AI Integration Methods
     private async _getBookWritingResponse(userMessage: string): Promise<string> {
+        const contextSummary = this._getContextSummary();
+        
         const enhancedPrompt = `You are a professional book writing assistant specializing in creating educational and training content. You help authors create structured learning materials including:
 
 CONTENT TYPES YOU GENERATE:
@@ -371,11 +460,10 @@ CONTENT TYPES YOU GENERATE:
 4. QUIZZES - Complete assessments with multiple choice, true/false, short answer, and practical questions plus full answer keys
 5. SUMMARIES - Comprehensive reviews with key concepts, terminology tables, best practices checklists, action items, and reflection questions
 
-CONTEXT: The user is working on educational content creation using our Book Writing Assistant VS Code extension. They can generate markdown files for any topic in various domains (Technology, Business, Science, Health, Education, Arts, etc.).
+${contextSummary}USER QUESTION: ${userMessage}
 
-USER QUESTION: ${userMessage}
-
-Please provide helpful, specific advice about book writing, content structure, pedagogical approaches, or how to use the content generation features effectively. If they're asking about a specific topic, help them understand how to structure it for learning.`;
+CONTEXT AWARENESS: Use the session context above to provide relevant, informed responses. If the user is working on a specific topic/domain, reference it appropriately. If they've generated files, acknowledge their progress. Provide helpful, specific advice about book writing, content structure, pedagogical approaches, or how to use the content generation features effectively.`;
+        
         return await this._getAIResponse(enhancedPrompt);
     }
 
@@ -931,7 +1019,33 @@ Key steps or code snippets
 
     private _getBookWritingFallback(userMessage: string): string {
         const lowerMessage = userMessage.toLowerCase();
+        const project = this._sessionContext.currentProject;
+        const hasProject = project.mainTopic && project.domain;
         
+        // Context-aware responses
+        if (hasProject) {
+            if (lowerMessage.includes('outline') || lowerMessage.includes('structure')) {
+                return `I can help you create chapter outlines for your ${project.domain} book about "${project.mainTopic}"! Use the quick actions above to generate structured outlines.`;
+            }
+            
+            if (lowerMessage.includes('lesson') || lowerMessage.includes('content')) {
+                return `Let's create engaging lesson content for "${project.mainTopic}"! The lesson generator can help you build comprehensive educational materials with examples and explanations specific to ${project.domain}.`;
+            }
+            
+            if (lowerMessage.includes('exercise') || lowerMessage.includes('practice')) {
+                return `Practical exercises are crucial for learning "${project.mainTopic}"! I can generate hands-on activities and practice problems tailored to ${project.domain}.`;
+            }
+            
+            if (lowerMessage.includes('quiz') || lowerMessage.includes('test') || lowerMessage.includes('assessment')) {
+                return `Assessments help reinforce learning about "${project.mainTopic}"! Try the quiz generator to create comprehensive tests for your ${project.domain} content.`;
+            }
+            
+            if (lowerMessage.includes('summary') || lowerMessage.includes('review')) {
+                return `Summaries are perfect for reinforcing key concepts of "${project.mainTopic}"! Generate structured summaries with key terms, best practices, and action items for ${project.domain}.`;
+            }
+        }
+        
+        // Generic responses when no project context
         if (lowerMessage.includes('outline') || lowerMessage.includes('structure')) {
             return "I can help you create chapter outlines! Use the quick actions above to generate structured outlines for any topic in your domain.";
         }
@@ -952,7 +1066,12 @@ Key steps or code snippets
             return "Summaries are perfect for reinforcing key concepts! Generate structured summaries with key terms, best practices, and action items.";
         }
 
-        const responses = [
+        const responses = hasProject ? [
+            `I'm your book writing assistant! I can help you continue working on your ${project.domain} book about "${project.mainTopic}". What would you like to create next?`,
+            `Great progress on your "${project.mainTopic}" content! I can help you generate more chapters, lessons, exercises, quizzes, and summaries for your ${project.domain} book.`,
+            `You're building excellent ${project.domain} content about "${project.mainTopic}"! What type of learning material would you like to create next?`,
+            `I see you're working on "${project.mainTopic}" in the ${project.domain} domain. How can I help you expand your educational content?`
+        ] : [
             "I'm your book writing assistant! I can help you create chapters, lessons, exercises, quizzes, and summaries for educational content.",
             "What type of learning material would you like to create? I specialize in generating structured educational content in markdown format.",
             "I can help you write comprehensive training materials. What subject area or domain are you focusing on?",
