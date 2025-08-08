@@ -4,17 +4,11 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 
-// Book Writing Assistant Class
-class BookWritingPanel {
-    public static currentPanel: BookWritingPanel | undefined;
-    public static readonly viewType = 'bookWriting';
-
-    private readonly _panel: vscode.WebviewPanel;
-    private readonly _extensionUri: vscode.Uri;
-    private _disposables: vscode.Disposable[] = [];
+// Shared context manager
+class SessionContextManager {
+    private static _instance: SessionContextManager;
     
-    // Context tracking for AI awareness
-    private _sessionContext: {
+    private _context: {
         recentActivities: Array<{
             timestamp: Date;
             action: 'content_generation' | 'file_creation' | 'chat';
@@ -35,6 +29,744 @@ class BookWritingPanel {
             generatedFiles: []
         }
     };
+
+    public static getInstance(): SessionContextManager {
+        if (!SessionContextManager._instance) {
+            SessionContextManager._instance = new SessionContextManager();
+        }
+        return SessionContextManager._instance;
+    }
+
+    public addToContext(action: 'content_generation' | 'file_creation' | 'chat', details: string, metadata?: any) {
+        this._context.recentActivities.push({
+            timestamp: new Date(),
+            action,
+            details,
+            ...metadata
+        });
+        
+        // Keep only last 10 activities to prevent memory issues
+        if (this._context.recentActivities.length > 10) {
+            this._context.recentActivities = this._context.recentActivities.slice(-10);
+        }
+    }
+
+    public updateProjectContext(topic?: string, domain?: string) {
+        if (topic) {
+            this._context.currentProject.mainTopic = topic;
+        }
+        if (domain) {
+            this._context.currentProject.domain = domain;
+        }
+    }
+
+    public addGeneratedFile(filename: string) {
+        this._context.currentProject.generatedFiles.push(filename);
+    }
+
+    public getContextSummary(): string {
+        const recent = this._context.recentActivities.slice(-5); // Last 5 activities
+        const project = this._context.currentProject;
+        
+        let contextSummary = '';
+        
+        if (project.mainTopic && project.domain) {
+            contextSummary += `CURRENT PROJECT CONTEXT:\n`;
+            contextSummary += `- Main Topic: ${project.mainTopic}\n`;
+            contextSummary += `- Domain: ${project.domain}\n`;
+            contextSummary += `- Generated Files: ${project.generatedFiles.length > 0 ? project.generatedFiles.join(', ') : 'None yet'}\n\n`;
+        }
+        
+        if (recent.length > 0) {
+            contextSummary += `RECENT ACTIVITIES:\n`;
+            recent.forEach((activity, index) => {
+                const timeAgo = Math.round((Date.now() - activity.timestamp.getTime()) / 60000); // minutes ago
+                contextSummary += `${index + 1}. ${activity.details} (${timeAgo} min ago)\n`;
+            });
+            contextSummary += '\n';
+        }
+        
+        return contextSummary;
+    }
+
+    public getCurrentProject() {
+        return this._context.currentProject;
+    }
+}
+
+// Sidebar Chat Provider
+class BookWritingChatProvider implements vscode.WebviewViewProvider {
+    public static readonly viewType = 'bookWritingChat';
+    
+    private _view?: vscode.WebviewView;
+    private _contextManager = SessionContextManager.getInstance();
+
+    constructor(private readonly _extensionUri: vscode.Uri) {}
+
+    public resolveWebviewView(
+        webviewView: vscode.WebviewView,
+        context: vscode.WebviewViewResolveContext,
+        _token: vscode.CancellationToken,
+    ) {
+        this._view = webviewView;
+
+        webviewView.webview.options = {
+            enableScripts: true,
+            localResourceRoots: [this._extensionUri]
+        };
+
+        webviewView.webview.html = this._getChatHtml();
+
+        webviewView.webview.onDidReceiveMessage(async (data) => {
+            switch (data.command) {
+                case 'sendMessage':
+                    await this._handleChatMessage(data.text);
+                    break;
+            }
+        });
+    }
+
+    private async _handleChatMessage(userMessage: string) {
+        if (!this._view) {
+            return;
+        }
+
+        try {
+            // Track chat activity in context
+            this._contextManager.addToContext('chat', `User asked: "${userMessage}"`);
+
+            // Show typing indicator
+            this._view.webview.postMessage({
+                command: 'addChatMessage',
+                sender: 'assistant',
+                text: '📝 Writing...'
+            });
+
+            // Get AI response with full context awareness
+            const aiResponse = await this._getBookWritingResponse(userMessage);
+            
+            // Replace thinking message with actual response
+            this._view.webview.postMessage({
+                command: 'replaceChatMessage',
+                sender: 'assistant',
+                text: aiResponse
+            });
+        } catch (error) {
+            console.log('AI not available, using fallback responses:', error);
+            
+            const smartResponse = this._getBookWritingFallback(userMessage);
+            
+            this._view.webview.postMessage({
+                command: 'replaceChatMessage',
+                sender: 'assistant',
+                text: smartResponse
+            });
+        }
+    }
+
+    // AI Integration Methods (same as main panel)
+    private async _getBookWritingResponse(userMessage: string): Promise<string> {
+        const contextSummary = this._contextManager.getContextSummary();
+        
+        const enhancedPrompt = `You are a professional book writing assistant specializing in creating educational and training content. You help authors create structured learning materials including:
+
+CONTENT TYPES YOU GENERATE:
+1. CHAPTER OUTLINES - Structured learning plans with objectives, sections (Introduction, Core Concepts, Practical Applications, Best Practices, Advanced Topics, Summary), and assessments
+2. LESSON CONTENT - Comprehensive educational lessons with definitions, examples, best practices, common challenges, and next steps
+3. EXERCISES - Hands-on activities with basic understanding, practical application, and problem-solving tasks plus self-assessment
+4. QUIZZES - Complete assessments with multiple choice, true/false, short answer, and practical questions plus full answer keys
+5. SUMMARIES - Comprehensive reviews with key concepts, terminology tables, best practices checklists, action items, and reflection questions
+
+${contextSummary}USER QUESTION: ${userMessage}
+
+CONTEXT AWARENESS: Use the session context above to provide relevant, informed responses. If the user is working on a specific topic/domain, reference it appropriately. If they've generated files, acknowledge their progress. Provide helpful, specific advice about book writing, content structure, pedagogical approaches, or how to use the content generation features effectively.`;
+        
+        return await this._getAIResponse(enhancedPrompt);
+    }
+
+    private async _getAIResponse(prompt: string): Promise<string> {
+        // Try different AI services in order of preference
+        try {
+            return await this._callOpenAI(prompt);
+        } catch (error) {
+            console.log('OpenAI failed, trying other options:', error);
+        }
+
+        try {
+            return await this._callLocalAI(prompt);
+        } catch (error) {
+            console.log('Local AI failed:', error);
+        }
+
+        try {
+            return await this._callClaudeAPI(prompt);
+        } catch (error) {
+            console.log('Claude failed:', error);
+        }
+
+        throw new Error('All AI services unavailable');
+    }
+
+    // AI API methods (same as main panel - could be extracted to shared service)
+    private async _callOpenAI(prompt: string): Promise<string> {
+        const apiKey = process.env.OPENAI_API_KEY;
+        if (!apiKey) {
+            throw new Error('OpenAI API key not configured');
+        }
+
+        try {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4',
+                    messages: [
+                        {
+                            role: 'system',
+                            content: `You are a professional book writing assistant for VS Code sidebar chat. Provide concise, helpful responses about educational content creation, book writing, and pedagogical approaches. Keep responses focused and actionable.`
+                        },
+                        {
+                            role: 'user',
+                            content: prompt
+                        }
+                    ],
+                    max_tokens: 1500,
+                    temperature: 0.7
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`OpenAI API error: ${response.status}`);
+            }
+
+            const data = await response.json() as any;
+            return data.choices?.[0]?.message?.content || 'No response from OpenAI';
+            
+        } catch (error) {
+            console.log('OpenAI API error:', error);
+            throw error;
+        }
+    }
+
+    private async _callLocalAI(prompt: string): Promise<string> {
+        try {
+            const systemPrompt = `You are a book writing assistant for VS Code sidebar. Provide concise, helpful advice about educational content creation.`;
+            
+            const response = await fetch('http://localhost:11434/api/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'llama2',
+                    prompt: `${systemPrompt}\n\nUser Request: ${prompt}\n\nResponse:`,
+                    stream: false
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Local AI error: ${response.status}`);
+            }
+
+            const data = await response.json() as any;
+            return data.response || 'No response from local AI';
+            
+        } catch (error) {
+            console.log('Local AI error:', error);
+            throw error;
+        }
+    }
+
+    private async _callClaudeAPI(prompt: string): Promise<string> {
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) {
+            throw new Error('Anthropic API key not configured');
+        }
+
+        try {
+            const response = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json',
+                    'anthropic-version': '2023-06-01'
+                },
+                body: JSON.stringify({
+                    model: 'claude-3-sonnet-20240229',
+                    max_tokens: 1500,
+                    messages: [
+                        {
+                            role: 'user',
+                            content: `You are a book writing assistant for VS Code sidebar chat. Provide concise, helpful responses about educational content creation and book writing. ${prompt}`
+                        }
+                    ]
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Claude API error: ${response.status}`);
+            }
+
+            const data = await response.json() as any;
+            return data.content?.[0]?.text || 'No response from Claude';
+            
+        } catch (error) {
+            console.log('Claude API error:', error);
+            throw error;
+        }
+    }
+
+    private _getBookWritingFallback(userMessage: string): string {
+        const lowerMessage = userMessage.toLowerCase();
+        const project = this._contextManager.getCurrentProject();
+        const hasProject = project.mainTopic && project.domain;
+        
+        // Context-aware responses (shortened for sidebar)
+        if (hasProject) {
+            if (lowerMessage.includes('outline') || lowerMessage.includes('structure')) {
+                return `💡 Create chapter outlines for your ${project.domain} book about "${project.mainTopic}" using the Content Generator panel.`;
+            }
+            
+            if (lowerMessage.includes('lesson') || lowerMessage.includes('content')) {
+                return `📖 Generate lesson content for "${project.mainTopic}" in the ${project.domain} domain using the generator.`;
+            }
+            
+            if (lowerMessage.includes('exercise') || lowerMessage.includes('practice')) {
+                return `💪 Create exercises for "${project.mainTopic}" to help students practice ${project.domain} concepts.`;
+            }
+        }
+
+        const responses = hasProject ? [
+            `📚 Working on "${project.mainTopic}" in ${project.domain}! How can I help with your book?`,
+            `✨ Great progress on your ${project.domain} content! What would you like to create next?`,
+            `🎯 I can help with chapters, lessons, exercises, quizzes, and summaries for "${project.mainTopic}".`
+        ] : [
+            "📝 I'm your book writing assistant! Ask me about creating educational content.",
+            "🚀 I can help you structure lessons, create exercises, and write comprehensive learning materials.",
+            "💡 What type of educational content are you working on today?"
+        ];
+        
+        return responses[Math.floor(Math.random() * responses.length)];
+    }
+
+    private _getChatHtml(): string {
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Writing Chat</title>
+    <style>
+        body {
+            font-family: var(--vscode-font-family);
+            font-size: var(--vscode-font-size);
+            color: var(--vscode-foreground);
+            background: var(--vscode-sideBar-background);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+        }
+        
+        .chat-header {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .chat-header h3 {
+            margin: 0;
+            color: var(--vscode-foreground);
+            font-size: 14px;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            padding: 5px;
+            max-height: calc(100vh - 120px);
+        }
+        
+        .chat-message {
+            margin-bottom: 12px;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        
+        .user-message {
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            margin-left: 10px;
+        }
+        
+        .assistant-message {
+            background: var(--vscode-textBlockQuote-background);
+            margin-right: 10px;
+            border-left: 3px solid var(--vscode-textLink-foreground);
+            padding-left: 10px;
+        }
+        
+        .chat-input-container {
+            padding: 10px 0;
+            border-top: 1px solid var(--vscode-panel-border);
+        }
+        
+        .chat-input {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .chat-input input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 4px;
+            background: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            font-family: inherit;
+            font-size: 13px;
+        }
+        
+        .chat-input input:focus {
+            outline: none;
+            border-color: var(--vscode-focusBorder);
+        }
+        
+        .send-btn {
+            padding: 8px 12px;
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+        }
+        
+        .send-btn:hover {
+            background: var(--vscode-button-hoverBackground);
+        }
+        
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .welcome-message {
+            text-align: center;
+            color: var(--vscode-descriptionForeground);
+            font-size: 12px;
+            padding: 20px 10px;
+            border: 1px dashed var(--vscode-panel-border);
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h3>💬 Writing Assistant</h3>
+        </div>
+        
+        <div class="chat-messages" id="chatMessages">
+            <div class="welcome-message">
+                👋 Hi! I'm your book writing assistant. Ask me anything about creating educational content, structuring lessons, or pedagogical approaches.
+            </div>
+        </div>
+        
+        <div class="chat-input-container">
+            <div class="chat-input">
+                <input type="text" id="chatInput" placeholder="Ask about book writing..." />
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+
+            addChatMessage('user', message);
+            input.value = '';
+
+            vscode.postMessage({
+                command: 'sendMessage',
+                text: message
+            });
+        }
+
+        function addChatMessage(sender, text) {
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = \`chat-message \${sender}-message\`;
+            messageDiv.innerHTML = \`<strong>\${sender.charAt(0).toUpperCase() + sender.slice(1)}:</strong> \${text}\`;
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Handle Enter key
+        document.getElementById('chatInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Listen for messages from extension
+        window.addEventListener('message', event => {
+            const message = event.data;
+            
+            switch (message.command) {
+                case 'addChatMessage':
+                    addChatMessage(message.sender, message.text);
+                    break;
+                    
+                case 'replaceChatMessage':
+                    const messages = document.querySelectorAll('.assistant-message');
+                    if (messages.length > 0) {
+                        const lastMessage = messages[messages.length - 1];
+                        lastMessage.innerHTML = \`<strong>Assistant:</strong> \${message.text}\`;
+                    }
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>`;
+    }
+}
+
+// Sidebar Content Generator Provider
+class BookWritingContentProvider implements vscode.WebviewViewProvider {
+    public static readonly viewType = 'bookWritingContent';
+    
+    private _view?: vscode.WebviewView;
+
+    constructor(private readonly _extensionUri: vscode.Uri) {}
+
+    public resolveWebviewView(
+        webviewView: vscode.WebviewView,
+        context: vscode.WebviewViewResolveContext,
+        _token: vscode.CancellationToken,
+    ) {
+        this._view = webviewView;
+
+        webviewView.webview.options = {
+            enableScripts: true,
+            localResourceRoots: [this._extensionUri]
+        };
+
+        webviewView.webview.html = this._getContentGeneratorHtml();
+
+        webviewView.webview.onDidReceiveMessage(async (data) => {
+            switch (data.command) {
+                case 'generateContent':
+                    // Open the main panel for content generation
+                    vscode.commands.executeCommand('Author-AI-Assistant.openBookWriting');
+                    break;
+                case 'openMainPanel':
+                    vscode.commands.executeCommand('Author-AI-Assistant.openBookWriting');
+                    break;
+            }
+        });
+    }
+
+    private _getContentGeneratorHtml(): string {
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Generator</title>
+    <style>
+        body {
+            font-family: var(--vscode-font-family);
+            font-size: var(--vscode-font-size);
+            color: var(--vscode-foreground);
+            background: var(--vscode-sideBar-background);
+            margin: 0;
+            padding: 15px;
+        }
+        
+        .generator-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .header h3 {
+            margin: 0 0 5px 0;
+            color: var(--vscode-foreground);
+            font-size: 16px;
+        }
+        
+        .header p {
+            margin: 0;
+            color: var(--vscode-descriptionForeground);
+            font-size: 12px;
+        }
+        
+        .quick-action {
+            padding: 12px;
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 500;
+            text-align: left;
+            transition: all 0.2s;
+        }
+        
+        .quick-action:hover {
+            background: var(--vscode-button-hoverBackground);
+            transform: translateY(-1px);
+        }
+        
+        .quick-action .icon {
+            margin-right: 8px;
+            font-size: 16px;
+        }
+        
+        .quick-action .title {
+            font-weight: 600;
+            display: block;
+        }
+        
+        .quick-action .desc {
+            font-size: 11px;
+            opacity: 0.8;
+            margin-top: 2px;
+        }
+        
+        .main-panel-btn {
+            padding: 15px;
+            background: var(--vscode-textLink-foreground);
+            color: var(--vscode-editor-background);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            margin-top: 10px;
+        }
+        
+        .main-panel-btn:hover {
+            opacity: 0.9;
+        }
+        
+        .divider {
+            height: 1px;
+            background: var(--vscode-panel-border);
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="generator-container">
+        <div class="header">
+            <h3>📚 Content Generator</h3>
+            <p>Quick access to content creation</p>
+        </div>
+        
+        <button class="quick-action" onclick="generateContent('chapter-outline')">
+            <span class="icon">📋</span>
+            <span class="title">Chapter Outline</span>
+            <div class="desc">Structured learning plans with objectives</div>
+        </button>
+        
+        <button class="quick-action" onclick="generateContent('lesson-content')">
+            <span class="icon">📖</span>
+            <span class="title">Lesson Content</span>
+            <div class="desc">Comprehensive educational lessons</div>
+        </button>
+        
+        <button class="quick-action" onclick="generateContent('exercise')">
+            <span class="icon">💪</span>
+            <span class="title">Exercise</span>
+            <div class="desc">Hands-on activities and practice</div>
+        </button>
+        
+        <button class="quick-action" onclick="generateContent('quiz')">
+            <span class="icon">🧠</span>
+            <span class="title">Quiz</span>
+            <div class="desc">Complete assessments with answer keys</div>
+        </button>
+        
+        <button class="quick-action" onclick="generateContent('summary')">
+            <span class="icon">📝</span>
+            <span class="title">Summary</span>
+            <div class="desc">Key concepts and best practices</div>
+        </button>
+        
+        <div class="divider"></div>
+        
+        <button class="main-panel-btn" onclick="openMainPanel()">
+            🚀 Open Full Generator
+        </button>
+    </div>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+
+        function generateContent(type) {
+            // Open main panel for content generation
+            vscode.postMessage({
+                command: 'generateContent',
+                type: type
+            });
+        }
+
+        function openMainPanel() {
+            vscode.postMessage({
+                command: 'openMainPanel'
+            });
+        }
+    </script>
+</body>
+</html>`;
+    }
+}
+
+// Book Writing Assistant Class
+class BookWritingPanel {
+    public static currentPanel: BookWritingPanel | undefined;
+    public static readonly viewType = 'bookWriting';
+
+    private readonly _panel: vscode.WebviewPanel;
+    private readonly _extensionUri: vscode.Uri;
+    private _disposables: vscode.Disposable[] = [];
+    private _contextManager = SessionContextManager.getInstance();
 
     public static createOrShow(extensionUri: vscode.Uri) {
         const column = vscode.window.activeTextEditor
@@ -91,44 +823,13 @@ class BookWritingPanel {
         );
     }
 
-    // Context Management Methods
+    // Context Management Methods (using shared SessionContextManager)
     private _addToContext(action: 'content_generation' | 'file_creation' | 'chat', details: string, metadata?: any) {
-        this._sessionContext.recentActivities.push({
-            timestamp: new Date(),
-            action,
-            details,
-            ...metadata
-        });
-        
-        // Keep only last 10 activities to prevent memory issues
-        if (this._sessionContext.recentActivities.length > 10) {
-            this._sessionContext.recentActivities = this._sessionContext.recentActivities.slice(-10);
-        }
+        this._contextManager.addToContext(action, details, metadata);
     }
     
     private _getContextSummary(): string {
-        const recent = this._sessionContext.recentActivities.slice(-5); // Last 5 activities
-        const project = this._sessionContext.currentProject;
-        
-        let contextSummary = '';
-        
-        if (project.mainTopic && project.domain) {
-            contextSummary += `CURRENT PROJECT CONTEXT:\n`;
-            contextSummary += `- Main Topic: ${project.mainTopic}\n`;
-            contextSummary += `- Domain: ${project.domain}\n`;
-            contextSummary += `- Generated Files: ${project.generatedFiles.length > 0 ? project.generatedFiles.join(', ') : 'None yet'}\n\n`;
-        }
-        
-        if (recent.length > 0) {
-            contextSummary += `RECENT ACTIVITIES:\n`;
-            recent.forEach((activity, index) => {
-                const timeAgo = Math.round((Date.now() - activity.timestamp.getTime()) / 60000); // minutes ago
-                contextSummary += `${index + 1}. ${activity.details} (${timeAgo} min ago)\n`;
-            });
-            contextSummary += '\n';
-        }
-        
-        return contextSummary;
+        return this._contextManager.getContextSummary();
     }
 
     private async _handleContentGeneration(type: string, topic: string, domain: string) {
@@ -139,8 +840,7 @@ class BookWritingPanel {
             });
             
             // Update current project context
-            this._sessionContext.currentProject.mainTopic = topic;
-            this._sessionContext.currentProject.domain = domain;
+            this._contextManager.updateProjectContext(topic, domain);
 
             // Show loading indicator
             this._panel.webview.postMessage({
@@ -214,7 +914,7 @@ class BookWritingPanel {
             
             // Track file creation in context
             this._addToContext('file_creation', `Created file: ${filename}`, { filename });
-            this._sessionContext.currentProject.generatedFiles.push(filename);
+            this._contextManager.addGeneratedFile(filename);
             
             // Open the created file
             const document = await vscode.workspace.openTextDocument(filePath);
@@ -1031,7 +1731,7 @@ Key steps or code snippets
 
     private _getBookWritingFallback(userMessage: string): string {
         const lowerMessage = userMessage.toLowerCase();
-        const project = this._sessionContext.currentProject;
+        const project = this._contextManager.getCurrentProject();
         const hasProject = project.mainTopic && project.domain;
         
         // Context-aware responses
@@ -1554,6 +2254,18 @@ Key steps or code snippets
 export function activate(context: vscode.ExtensionContext) {
     console.log('Book Writing Assistant extension is now active!');
 
+    // Register sidebar chat provider
+    const chatProvider = new BookWritingChatProvider(context.extensionUri);
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(BookWritingChatProvider.viewType, chatProvider)
+    );
+
+    // Register sidebar content generator provider
+    const contentProvider = new BookWritingContentProvider(context.extensionUri);
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(BookWritingContentProvider.viewType, contentProvider)
+    );
+
     // Register command to open book writing assistant
     const openBookWriting = vscode.commands.registerCommand('Author-AI-Assistant.openBookWriting', () => {
         BookWritingPanel.createOrShow(context.extensionUri);
@@ -1562,6 +2274,11 @@ export function activate(context: vscode.ExtensionContext) {
     // Register legacy commands for backwards compatibility
     const openChat = vscode.commands.registerCommand('Author-AI-Assistant.openChat', () => {
         BookWritingPanel.createOrShow(context.extensionUri);
+    });
+
+    // Register command to open chat sidebar
+    const openChatSidebar = vscode.commands.registerCommand('Author-AI-Assistant.openChatSidebar', () => {
+        vscode.commands.executeCommand('workbench.view.extension.bookWriting');
     });
 
     const helloCommand = vscode.commands.registerCommand('Author-AI-Assistant.helloWorld', () => {
@@ -1630,7 +2347,7 @@ Generated with Book Writing Assistant for VS Code.
         }
     });
 
-    context.subscriptions.push(openBookWriting, openChat, helloCommand, createBookStructure);
+    context.subscriptions.push(openBookWriting, openChat, openChatSidebar, helloCommand, createBookStructure);
 }
 
 // This method is called when your extension is deactivated

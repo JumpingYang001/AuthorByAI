@@ -37,8 +37,38 @@
         "command": "Author-AI-Assistant.createBookStructure",
         "title": "Create Book Structure",
         "category": "Book Writing"
+      },
+      {
+        "command": "Author-AI-Assistant.openChatSidebar",
+        "title": "$(comment-discussion) Book Writing Chat",
+        "category": "Book Writing"
       }
-    ]
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "bookWriting",
+          "title": "Book Writing Assistant",
+          "icon": "$(book)"
+        }
+      ]
+    },
+    "views": {
+      "bookWriting": [
+        {
+          "id": "bookWritingChat",
+          "name": "Writing Assistant Chat",
+          "type": "webview",
+          "icon": "$(comment-discussion)"
+        },
+        {
+          "id": "bookWritingContent",
+          "name": "Content Generator",
+          "type": "webview",
+          "icon": "$(file-text)"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
