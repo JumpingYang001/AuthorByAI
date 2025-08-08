@@ -40,7 +40,7 @@
       },
       {
         "command": "Author-AI-Assistant.openChatSidebar",
-        "title": "$(comment-discussion) Book Writing Chat",
+        "title": "$(comment-discussion) Book Writing Sidebar Chat",
         "category": "Book Writing"
       }
     ],
