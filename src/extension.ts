@@ -333,7 +333,11 @@ CONTEXT AWARENESS: If this relates to previously generated content, ensure consi
     }
 
     private async _generateExercise(topic: string, domain: string): Promise<string> {
+        const contextSummary = this._getContextSummary();
+        
         const prompt = `You are a professional educational content writer. Create practical exercises and hands-on activities for learning "${topic}" in the ${domain} domain.
+
+${contextSummary}CONTENT REQUEST: Create exercises for "${topic}" in ${domain} domain.
 
 REQUIRED FORMAT:
 - Use markdown formatting
@@ -358,7 +362,7 @@ MUST INCLUDE:
    - Reflection questions
 5. Additional Practice suggestions
 
-Make exercises progressively challenging. Include specific, actionable tasks that learners can complete. Ensure exercises are practical and relevant to ${domain} professionals.`;
+CONTEXT AWARENESS: If this builds on previously generated content, reference it appropriately and ensure natural progression. Make exercises progressively challenging. Include specific, actionable tasks that learners can complete. Ensure exercises are practical and relevant to ${domain} professionals.`;
         
         try {
             return await this._getAIResponse(prompt);
@@ -368,7 +372,11 @@ Make exercises progressively challenging. Include specific, actionable tasks tha
     }
 
     private async _generateQuiz(topic: string, domain: string): Promise<string> {
+        const contextSummary = this._getContextSummary();
+        
         const prompt = `You are a professional educational content writer. Create a comprehensive quiz about "${topic}" in the ${domain} domain.
+
+${contextSummary}CONTENT REQUEST: Create a quiz for "${topic}" in ${domain} domain.
 
 REQUIRED FORMAT:
 - Use markdown formatting
@@ -393,7 +401,7 @@ MUST INCLUDE:
    - Sample responses for short answer questions
    - Evaluation criteria for practical questions
 
-Make questions challenging but fair. Ensure they test understanding, application, and critical thinking about ${topic} in ${domain} context.`;
+CONTEXT AWARENESS: If this relates to previously generated content, ensure questions align with that material. Make questions challenging but fair. Ensure they test understanding, application, and critical thinking about ${topic} in ${domain} context.`;
         
         try {
             return await this._getAIResponse(prompt);
@@ -403,7 +411,11 @@ Make questions challenging but fair. Ensure they test understanding, application
     }
 
     private async _generateSummary(topic: string, domain: string): Promise<string> {
+        const contextSummary = this._getContextSummary();
+        
         const prompt = `You are a professional educational content writer. Write a concise but comprehensive summary of "${topic}" in the ${domain} domain.
+
+${contextSummary}CONTENT REQUEST: Create a summary for "${topic}" in ${domain} domain.
 
 REQUIRED FORMAT:
 - Use markdown formatting with proper headings and tables
@@ -438,7 +450,7 @@ MUST INCLUDE:
    - Code snippets if applicable
 9. Reflection Questions (3 questions)
 
-Make it a comprehensive reference that learners can return to. Focus on practical, actionable information relevant to ${domain} professionals.`;
+CONTEXT AWARENESS: If this summarizes previously generated content, ensure it ties everything together coherently. Make it a comprehensive reference that learners can return to. Focus on practical, actionable information relevant to ${domain} professionals.`;
         
         try {
             return await this._getAIResponse(prompt);
