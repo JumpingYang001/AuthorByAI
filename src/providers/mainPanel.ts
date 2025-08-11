@@ -146,7 +146,7 @@ export class BookWritingPanel {
             }
 
             // Determine the appropriate subdirectory based on content type
-            const subDirectory = this._getSubDirectoryForContentType();
+            const subDirectory = await this._getSubDirectoryForContentType();
             
             const sanitizedFilename = filename.replace(/[<>:"/\\|?*]/g, '-');
             const finalFilename = sanitizedFilename.endsWith('.md') ? sanitizedFilename : `${sanitizedFilename}.md`;
@@ -201,7 +201,7 @@ export class BookWritingPanel {
     /**
      * Gets the appropriate subdirectory for the current content type
      */
-    private _getSubDirectoryForContentType(): string {
+    private async _getSubDirectoryForContentType(): Promise<string> {
         console.log('Debug: currentRequest:', this.currentRequest);
         console.log('Debug: contentType:', this.currentRequest?.contentType);
         
@@ -221,16 +221,33 @@ export class BookWritingPanel {
         if (workspaceFolder) {
             try {
                 // Check if key book folders exist
-                const chaptersPath = vscode.Uri.joinPath(workspaceFolder.uri, 'chapters');
-                const exercisesPath = vscode.Uri.joinPath(workspaceFolder.uri, 'exercises');
-                // Note: We can't use async fs.stat in this sync method, so we'll use the context method
-                // This is a fallback improvement for future iterations
+                const keyFolders = ['outlines', 'lessons', 'exercises', 'quizzes', 'summaries'];
+                const folderChecks = await Promise.all(
+                    keyFolders.map(async (folder) => {
+                        try {
+                            const folderUri = vscode.Uri.joinPath(workspaceFolder.uri, folder);
+                            await vscode.workspace.fs.stat(folderUri);
+                            return true;
+                        } catch {
+                            return false;
+                        }
+                    })
+                );
+                
+                // If at least 3 out of 5 key folders exist, consider it a book project
+                const existingFoldersCount = folderChecks.filter(exists => exists).length;
+                hasBookStructureFolders = existingFoldersCount >= 3;
+                console.log('Debug: Existing book folders count:', existingFoldersCount, '/', keyFolders.length);
+                
             } catch (error) {
-                // Ignore errors, fallback to context check
+                console.log('Debug: Error checking folder existence:', error);
+                hasBookStructureFolders = false;
             }
         }
 
-        const hasBookStructure = hasBookStructureInContext || true; // Temporarily force true for testing
+        const hasBookStructure = hasBookStructureInContext || hasBookStructureFolders;
+        console.log('Debug: hasBookStructureInContext:', hasBookStructureInContext);
+        console.log('Debug: hasBookStructureFolders:', hasBookStructureFolders);
         console.log('Debug: hasBookStructure:', hasBookStructure);
 
         if (!hasBookStructure) {
@@ -240,10 +257,10 @@ export class BookWritingPanel {
 
         // Map content types to subdirectories
         const folderMap: Record<string, string> = {
-            'chapter_outline': 'chapters',
-            'lesson_content': 'chapters',  // Lessons are part of chapters
+            'chapter_outline': 'outlines',     // Chapter outlines go to outlines/
+            'lesson_content': 'lessons',       // Lesson content goes to lessons/
             'exercise': 'exercises',
-            'quiz': 'quizzes',
+            'quiz': 'quizzes', 
             'summary': 'summaries'
         };
 

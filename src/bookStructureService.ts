@@ -96,13 +96,14 @@ export class BookStructureService {
      */
     private async _createDirectories(baseUri: vscode.Uri): Promise<void> {
         const folders = [
-            'chapters',
-            'exercises',
-            'quizzes',
-            'summaries',
-            'assets/images',
-            'assets/code-examples',
-            'templates'
+            'outlines',              // Chapter outlines & structure
+            'lessons',               // Detailed lesson content
+            'exercises',             // Hands-on activities
+            'quizzes',              // Assessments
+            'summaries',            // Chapter/lesson summaries
+            'assets/images',        // Images and visual resources
+            'assets/code-examples', // Code samples and examples
+            'templates'             // Reusable content templates
         ];
 
         for (const folder of folders) {
@@ -125,7 +126,11 @@ export class BookStructureService {
                 content: this._generateBookOutlineContent(bookTitle)
             },
             {
-                path: 'chapters/.gitkeep',
+                path: 'outlines/.gitkeep',
+                content: ''
+            },
+            {
+                path: 'lessons/.gitkeep',
                 content: ''
             },
             {
@@ -158,10 +163,11 @@ export class BookStructureService {
 
 This book is organized into the following sections:
 
-- **chapters/**: Main content chapters
-- **exercises/**: Hands-on activities and exercises
-- **quizzes/**: Assessment materials
-- **summaries/**: Chapter and section summaries
+- **outlines/**: High-level chapter outlines and structure planning
+- **lessons/**: Detailed lesson content and educational materials
+- **exercises/**: Hands-on activities and practical exercises
+- **quizzes/**: Assessment materials and knowledge checks
+- **summaries/**: Chapter and lesson summaries
 - **assets/**: Images, code examples, and other resources
 - **templates/**: Reusable content templates
 
@@ -196,10 +202,11 @@ Use the Book Writing Assistant extension to generate content for each section.
 ${bookTitle}/
 ├── README.md                 # This file
 ├── book-outline.md          # Overall book structure and outline
-├── chapters/                # Main content chapters
-├── exercises/               # Hands-on activities
-├── quizzes/                # Assessment materials
-├── summaries/              # Chapter summaries
+├── outlines/                # Chapter outlines and structure planning
+├── lessons/                 # Detailed lesson content
+├── exercises/               # Hands-on activities and exercises
+├── quizzes/                # Assessment materials and knowledge checks
+├── summaries/              # Chapter and lesson summaries
 ├── assets/                 # Images, code examples, resources
 │   ├── images/
 │   └── code-examples/
@@ -349,7 +356,7 @@ By the end of this book, readers will be able to:
         sessionManager.addToContext('content_generation', `Book project "${bookTitle}" initialized with complete folder structure`, {
             type: 'project_setup',
             bookTitle: bookTitle,
-            folders: ['chapters', 'exercises', 'quizzes', 'summaries', 'assets', 'templates'],
+            folders: ['outlines', 'lessons', 'exercises', 'quizzes', 'summaries', 'assets', 'templates'],
             files: ['README.md', 'book-outline.md']
         });
     }
