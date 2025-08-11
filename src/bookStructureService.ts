@@ -20,7 +20,32 @@ export class BookStructureService {
     public async createBookStructure(): Promise<void> {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
-            vscode.window.showErrorMessage('Please open a workspace folder first to create book structure.');
+            // Offer to open a folder instead of just showing an error
+            const action = await vscode.window.showWarningMessage(
+                'No workspace folder is open. Would you like to open a folder to create your book structure?',
+                'Open Folder',
+                'Cancel'
+            );
+            
+            if (action === 'Open Folder') {
+                // Open folder dialog
+                const folderUri = await vscode.window.showOpenDialog({
+                    canSelectFiles: false,
+                    canSelectFolders: true,
+                    canSelectMany: false,
+                    openLabel: 'Select Folder for Book Project'
+                });
+
+                if (folderUri && folderUri[0]) {
+                    // Open the selected folder as workspace
+                    await vscode.commands.executeCommand('vscode.openFolder', folderUri[0], false);
+                    // Note: After opening folder, VS Code will reload and the extension will reactivate
+                    // So we show a message about what to do next
+                    vscode.window.showInformationMessage(
+                        'Folder opened! Please run "Create Book Structure" command again after VS Code reloads.'
+                    );
+                }
+            }
             return;
         }
 
