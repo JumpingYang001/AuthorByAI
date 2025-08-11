@@ -11,7 +11,6 @@ import { ContentType, ContentGenerationRequest, WebviewMessage } from './types';
 
 // Import webview providers
 import { BookWritingChatProvider } from './providers/chatProvider';
-import { BookWritingContentProvider } from './providers/contentProvider';
 import { BookWritingPanel } from './providers/mainPanel';
 
 // This method is called when your extension is activated
@@ -22,12 +21,6 @@ export function activate(context: vscode.ExtensionContext) {
     const chatProvider = new BookWritingChatProvider(context.extensionUri);
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(BookWritingChatProvider.viewType, chatProvider)
-    );
-
-    // Register sidebar content generator provider
-    const contentProvider = new BookWritingContentProvider(context.extensionUri);
-    context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider(BookWritingContentProvider.viewType, contentProvider)
     );
 
     // Register command to create book structure
@@ -41,9 +34,9 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('workbench.view.extension.bookWriting');
     });
 
-    // Register command to open combined chat + content generator panel (no Explorer conflict)
+    // Register command to open combined chat + main panel (no Explorer conflict)
     const openBookWritingPanel = vscode.commands.registerCommand('Author-AI-Assistant.openBookWritingPanel', () => {
-        // Create a combined panel with both chat and content generator
+        // Create a combined panel with both chat and main content functionality
         const panel = vscode.window.createWebviewPanel(
             'bookWritingCombined',
             '📚 Book Writing Assistant',
@@ -54,21 +47,21 @@ export function activate(context: vscode.ExtensionContext) {
             }
         );
 
-        // Create instances of both providers
+        // Create instances of chat provider 
         const chatProvider = new BookWritingChatProvider(context.extensionUri);
-        const contentProvider = new BookWritingContentProvider(context.extensionUri);
 
-        // Create combined HTML that includes both chat and content generator
-        panel.webview.html = getCombinedHtml(chatProvider, contentProvider);
+        // Create combined HTML that includes both chat and main panel functionality
+        panel.webview.html = getCombinedHtml(chatProvider);
         
-        // Handle messages from both chat and content generator
+        // Handle messages from chat
         panel.webview.onDidReceiveMessage(async (data) => {
             switch (data.command) {
                 case 'sendMessage':
                     await chatProvider._handleChatMessage(data.text, panel.webview);
                     break;
-                case 'generateContent':
-                    await contentProvider._handleContentGeneration(data, panel.webview);
+                case 'openContentGenerator':
+                    // Open the main content generator panel
+                    BookWritingPanel.createOrShow(context.extensionUri);
                     break;
             }
         });
@@ -88,9 +81,9 @@ export function deactivate() {
 }
 
 /**
- * Creates combined HTML that includes both chat and content generator interfaces
+ * Creates combined HTML with chat interface and button to open main content generator panel
  */
-function getCombinedHtml(chatProvider: BookWritingChatProvider, contentProvider: BookWritingContentProvider): string {
+function getCombinedHtml(chatProvider: BookWritingChatProvider): string {
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -112,8 +105,8 @@ function getCombinedHtml(chatProvider: BookWritingChatProvider, contentProvider:
 
         .container {
             display: flex;
+            flex-direction: column;
             height: 100%;
-            gap: 10px;
             padding: 10px;
         }
 
@@ -130,7 +123,23 @@ function getCombinedHtml(chatProvider: BookWritingChatProvider, contentProvider:
             padding: 15px;
             border-bottom: 1px solid var(--vscode-panel-border);
             font-weight: bold;
-            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .open-generator-btn {
+            padding: 8px 16px;
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .open-generator-btn:hover {
+            background: var(--vscode-button-hoverBackground);
         }
 
         .panel-content {
@@ -178,37 +187,7 @@ function getCombinedHtml(chatProvider: BookWritingChatProvider, contentProvider:
             cursor: pointer;
         }
 
-        /* Content generator styles */
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-
-        .form-group input, .form-group select, .form-group textarea {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid var(--vscode-input-border);
-            border-radius: 4px;
-            background: var(--vscode-input-background);
-            color: var(--vscode-input-foreground);
-            box-sizing: border-box;
-        }
-
-        .generate-btn {
-            width: 100%;
-            padding: 12px;
-            background: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-        }
+        /* Content generator styles - removed as no longer needed */
 
         .message {
             margin-bottom: 10px;
@@ -226,8 +205,9 @@ function getCombinedHtml(chatProvider: BookWritingChatProvider, contentProvider:
         }
 
         @media (max-width: 768px) {
-            .container {
-                flex-direction: column;
+            .open-generator-btn {
+                font-size: 10px;
+                padding: 6px 12px;
             }
         }
     </style>
@@ -236,57 +216,21 @@ function getCombinedHtml(chatProvider: BookWritingChatProvider, contentProvider:
     <div class="container">
         <!-- Chat Panel -->
         <div class="panel">
-            <div class="panel-header">💬 Chat Assistant</div>
+            <div class="panel-header">
+                <span>💬 Chat Assistant</span>
+                <button class="open-generator-btn" onclick="openContentGenerator()">📝 Open Generator</button>
+            </div>
             <div class="panel-content">
                 <div class="chat-container">
                     <div class="chat-messages" id="chatMessages">
                         <div class="message assistant">
-                            Hello! I'm your Book Writing Assistant. Ask me anything about creating educational content, book structure, or writing techniques.
+                            Hello! I'm your Book Writing Assistant. Ask me anything about creating educational content, book structure, or writing techniques. Use the "Open Generator" button to create specific content types.
                         </div>
                     </div>
                     <div class="chat-input">
                         <input type="text" id="chatInput" placeholder="Ask me anything about book writing..." />
                         <button onclick="sendMessage()">Send</button>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Content Generator Panel -->
-        <div class="panel">
-            <div class="panel-header">📝 Content Generator</div>
-            <div class="panel-content">
-                <div class="form-group">
-                    <label for="contentType">Content Type</label>
-                    <select id="contentType">
-                        <option value="chapter_outline">📋 Chapter Outline</option>
-                        <option value="lesson_content">📖 Lesson Content</option>
-                        <option value="exercise">💪 Exercise</option>
-                        <option value="quiz">❓ Quiz</option>
-                        <option value="summary">📝 Summary</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="topic">Topic/Title</label>
-                    <input type="text" id="topic" placeholder="e.g., Introduction to Machine Learning" />
-                </div>
-                
-                <div class="form-group">
-                    <label for="domain">Domain/Subject</label>
-                    <input type="text" id="domain" placeholder="e.g., Programming, Business, Science" />
-                </div>
-                
-                <div class="form-group">
-                    <label for="context">Additional Context (Optional)</label>
-                    <textarea id="context" rows="3" placeholder="Provide any specific requirements, target audience, learning objectives..."></textarea>
-                </div>
-                
-                <button class="generate-btn" onclick="generateContent()">🚀 Generate Content</button>
-                
-                <div id="generatedContent" style="margin-top: 20px; padding: 15px; background: var(--vscode-textBlockQuote-background); border-radius: 4px; display: none;">
-                    <h4>Generated Content:</h4>
-                    <pre id="contentText" style="white-space: pre-wrap; margin: 0;"></pre>
                 </div>
             </div>
         </div>
@@ -311,23 +255,9 @@ function getCombinedHtml(chatProvider: BookWritingChatProvider, contentProvider:
             });
         }
 
-        function generateContent() {
-            const contentType = document.getElementById('contentType').value;
-            const topic = document.getElementById('topic').value.trim();
-            const domain = document.getElementById('domain').value.trim();
-            const context = document.getElementById('context').value.trim();
-
-            if (!topic) {
-                alert('Please enter a topic');
-                return;
-            }
-
+        function openContentGenerator() {
             vscode.postMessage({
-                command: 'generateContent',
-                contentType: contentType,
-                topic: topic,
-                domain: domain || 'General',
-                context: context
+                command: 'openContentGenerator'
             });
         }
 
@@ -348,18 +278,6 @@ function getCombinedHtml(chatProvider: BookWritingChatProvider, contentProvider:
                 case 'addChatMessage':
                 case 'replaceChatMessage':
                     addChatMessage(message.sender, message.text);
-                    break;
-                    
-                case 'updateStatus':
-                    if (message.status === 'generating') {
-                        document.getElementById('generatedContent').style.display = 'block';
-                        document.getElementById('contentText').textContent = message.message;
-                    }
-                    break;
-                    
-                case 'contentGenerated':
-                    document.getElementById('generatedContent').style.display = 'block';
-                    document.getElementById('contentText').textContent = message.content;
                     break;
             }
         });

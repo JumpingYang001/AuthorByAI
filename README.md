@@ -19,7 +19,6 @@ src/
 ├── bookStructureService.ts  # Book project structure creation and management
 └── providers/               # Webview providers for UI components
     ├── chatProvider.ts      # Sidebar chat interface
-    ├── contentProvider.ts   # Sidebar content generator
     └── mainPanel.ts         # Main content editing panel
 ```
 
@@ -274,34 +273,7 @@ User Input → Chat Provider → Detect Intent →
 └── General Chat → AI Service → Helpful Response
 ```
 
-### 8. `providers/contentProvider.ts` - Sidebar Content Generator
-
-**Purpose**: Quick content generation interface in the sidebar.
-
-**Key Features**:
-- **Quick Generation**: Simple form for rapid content creation
-- **Shared Prompt Logic**: Uses `PromptBuilder` for consistent AI prompting
-- **Template Integration**: Uses template service for reliable fallbacks
-- **Main Panel Integration**: Automatically opens main panel with generated content
-- **Project Context Updates**: Updates session context with new content
-
-**Architecture Pattern**: Webview Provider + Command Pattern
-
-```typescript
-class BookWritingContentProvider implements vscode.WebviewViewProvider {
-    public resolveWebviewView()
-    private async _handleContentGeneration(request: ContentRequest)
-    // Uses: PromptBuilder.buildContentGenerationPrompt()
-}
-```
-
-**Generation Flow**:
-```
-User Form → Content Provider → PromptBuilder → AI Service → Generated Content → 
-Main Panel Opens → Content Displayed → Session Context Updated
-```
-
-### 9. `providers/mainPanel.ts` - Main Content Panel
+### 8. `providers/mainPanel.ts` - Main Content Panel
 
 **Purpose**: Primary content editing and display interface.
 
@@ -532,8 +504,7 @@ LOCAL_AI_URL=http://localhost:11434  # For Ollama
     },
     "views": {
       "bookWriting": [
-        {"id": "bookWritingChat", "name": "Writing Assistant Chat"},
-        {"id": "bookWritingContent", "name": "Content Generator"}
+        {"id": "bookWritingChat", "name": "Writing Assistant Chat"}
       ]
     }
   }
