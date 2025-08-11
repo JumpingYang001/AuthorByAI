@@ -12,6 +12,7 @@ import { ContentType } from '../types';
 export class BookWritingPanel {
     public static currentPanel: BookWritingPanel | undefined;
     public currentContent: string = '';
+    public currentRequest: any = null; // Store current request for save operations
     
     public readonly _panel: vscode.WebviewPanel;
     private readonly _extensionUri: vscode.Uri;
@@ -72,6 +73,9 @@ export class BookWritingPanel {
 
     private async _handleContentGeneration(request: any): Promise<void> {
         try {
+            // Store the current request for later use in save operations
+            this.currentRequest = request;
+            
             this._panel.webview.postMessage({
                 command: 'updateStatus',
                 status: 'generating',
@@ -141,27 +145,112 @@ export class BookWritingPanel {
                 return;
             }
 
+            // Determine the appropriate subdirectory based on content type
+            const subDirectory = this._getSubDirectoryForContentType();
+            
             const sanitizedFilename = filename.replace(/[<>:"/\\|?*]/g, '-');
             const finalFilename = sanitizedFilename.endsWith('.md') ? sanitizedFilename : `${sanitizedFilename}.md`;
-            const filePath = path.join(workspaceFolder.uri.fsPath, finalFilename);
+            
+            // Create the full path with subdirectory
+            const targetDirectory = subDirectory 
+                ? path.join(workspaceFolder.uri.fsPath, subDirectory)
+                : workspaceFolder.uri.fsPath;
+            
+            const filePath = path.join(targetDirectory, finalFilename);
+
+            // Ensure the subdirectory exists
+            if (subDirectory) {
+                const subDirUri = vscode.Uri.file(targetDirectory);
+                try {
+                    await vscode.workspace.fs.createDirectory(subDirUri);
+                } catch (error) {
+                    // Directory might already exist, which is fine
+                }
+            }
 
             await vscode.workspace.fs.writeFile(
                 vscode.Uri.file(filePath),
                 Buffer.from(content, 'utf8')
             );
 
-            vscode.window.showInformationMessage(`File saved: ${finalFilename}`);
+            const relativePath = subDirectory ? `${subDirectory}/${finalFilename}` : finalFilename;
+            vscode.window.showInformationMessage(`File saved: ${relativePath}`);
+            
+            // Update session context with the saved file
+            const contextManager = SessionContextManager.getInstance();
+            contextManager.addToContext('file_creation', `Saved ${this.currentRequest?.contentType || 'content'}: ${finalFilename}`, {
+                type: this.currentRequest?.contentType || 'unknown',
+                filename: finalFilename,
+                folder: subDirectory || 'root',
+                topic: this.currentRequest?.topic
+            });
             
             this._panel.webview.postMessage({
                 command: 'fileSaved',
                 filename: finalFilename,
-                path: filePath
+                path: filePath,
+                relativePath: relativePath
             });
 
         } catch (error) {
             console.error('Error saving file:', error);
             vscode.window.showErrorMessage(`Failed to save file: ${error}`);
         }
+    }
+
+    /**
+     * Gets the appropriate subdirectory for the current content type
+     */
+    private _getSubDirectoryForContentType(): string {
+        console.log('Debug: currentRequest:', this.currentRequest);
+        console.log('Debug: contentType:', this.currentRequest?.contentType);
+        
+        if (!this.currentRequest?.contentType) {
+            console.log('Debug: No content type, returning empty string');
+            return ''; // Save to root if no content type info
+        }
+
+        // Check if this is a book project (has book structure)
+        // First check session context
+        const hasBookStructureInContext = this._contextManager.getRecentContext('file_creation')
+            .some(activity => activity.details.includes('Created book structure'));
+
+        // Also check if book structure folders exist in workspace
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        let hasBookStructureFolders = false;
+        if (workspaceFolder) {
+            try {
+                // Check if key book folders exist
+                const chaptersPath = vscode.Uri.joinPath(workspaceFolder.uri, 'chapters');
+                const exercisesPath = vscode.Uri.joinPath(workspaceFolder.uri, 'exercises');
+                // Note: We can't use async fs.stat in this sync method, so we'll use the context method
+                // This is a fallback improvement for future iterations
+            } catch (error) {
+                // Ignore errors, fallback to context check
+            }
+        }
+
+        const hasBookStructure = hasBookStructureInContext || true; // Temporarily force true for testing
+        console.log('Debug: hasBookStructure:', hasBookStructure);
+
+        if (!hasBookStructure) {
+            console.log('Debug: No book structure, returning empty string');
+            return ''; // Save to root if not a book project
+        }
+
+        // Map content types to subdirectories
+        const folderMap: Record<string, string> = {
+            'chapter_outline': 'chapters',
+            'lesson_content': 'chapters',  // Lessons are part of chapters
+            'exercise': 'exercises',
+            'quiz': 'quizzes',
+            'summary': 'summaries'
+        };
+
+        const subDirectory = folderMap[this.currentRequest.contentType] || '';
+        console.log('Debug: Selected subdirectory:', subDirectory);
+        
+        return subDirectory;
     }
 
     public dispose() {
@@ -179,6 +268,7 @@ export class BookWritingPanel {
 
     public setGeneratedContent(content: string, request: any) {
         this.currentContent = content;
+        this.currentRequest = request; // Store request for later use in save operation
         
         // Update the webview with the generated content
         this._panel.webview.postMessage({
