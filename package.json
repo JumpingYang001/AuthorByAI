@@ -30,13 +30,8 @@
         "category": "Book Writing"
       },
       {
-        "command": "Author-AI-Assistant.openChatPanel",
-        "title": "$(comment-discussion) Open Chat Panel (Right Side)",
-        "category": "Book Writing"
-      },
-      {
-        "command": "Author-AI-Assistant.openContentPanel",
-        "title": "$(file-text) Open Content Generator Panel (Right Side)",
+        "command": "Author-AI-Assistant.openBookWritingPanel",
+        "title": "$(book) Open Book Writing Assistant Panel (Right Side)",
         "category": "Book Writing"
       }
     ],
@@ -53,14 +48,9 @@
         "mac": "cmd+shift+a"
       },
       {
-        "command": "Author-AI-Assistant.openChatPanel",
-        "key": "ctrl+shift+c",
-        "mac": "cmd+shift+c"
-      },
-      {
-        "command": "Author-AI-Assistant.openContentPanel",
-        "key": "ctrl+shift+g",
-        "mac": "cmd+shift+g"
+        "command": "Author-AI-Assistant.openBookWritingPanel",
+        "key": "ctrl+shift+w",
+        "mac": "cmd+shift+w"
       }
     ],
     "viewsContainers": {
