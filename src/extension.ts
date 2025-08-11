@@ -848,6 +848,8 @@ class BookWritingPanel {
 
     private async _handleContentGeneration(type: string, topic: string, domain: string) {
         try {
+            console.log(`Starting content generation: ${type} for "${topic}" in ${domain} domain`);
+            
             // Track this activity in session context
             this._addToContext('content_generation', `Generating ${type} for "${topic}" in ${domain} domain`, {
                 type, topic, domain
@@ -862,9 +864,13 @@ class BookWritingPanel {
                 message: `Generating ${type} for "${topic}" in ${domain} domain...`
             });
 
+            console.log('Loading message sent, starting content generation...');
+
             // Generate content based on type
             let content = '';
             let filename = '';
+            
+            console.log(`Generating content for type: ${type}`);
             
             switch (type) {
                 case 'chapter-outline':
@@ -891,15 +897,20 @@ class BookWritingPanel {
                     throw new Error('Unknown content type');
             }
 
+            console.log(`Content generated successfully, length: ${content.length}`);
+
             // Send generated content back to webview
-            this._panel.webview.postMessage({
+            const message = {
                 command: 'contentGenerated',
                 content: content,
                 filename: filename,
                 type: type
-            });
+            };
+            console.log('Sending message to webview:', message.command);
+            this._panel.webview.postMessage(message);
 
         } catch (error) {
+            console.error('Content generation failed:', error);
             this._panel.webview.postMessage({
                 command: 'showError',
                 message: `Failed to generate content: ${error}`
@@ -1003,8 +1014,12 @@ MUST INCLUDE:
 CONTEXT AWARENESS: If this builds on previously generated content, ensure consistency and natural progression. Make it comprehensive, pedagogically sound, and suitable for educational use.`;
         
         try {
-            return await this._getAIResponse(prompt);
+            console.log('Attempting to generate chapter outline with AI...');
+            const aiResponse = await this._getAIResponse(prompt);
+            console.log('AI response received successfully');
+            return aiResponse;
         } catch (error) {
+            console.log('AI failed, falling back to template:', error);
             return this._getChapterOutlineTemplate(topic, domain);
         }
     }
@@ -1213,6 +1228,7 @@ CONTEXT AWARENESS: Use the session context above to provide relevant, informed r
             console.log('Claude failed:', error);
         }
 
+        console.log('All AI services failed, this should trigger template fallback');
         throw new Error('All AI services unavailable');
     }
 
@@ -2137,18 +2153,6 @@ Key steps or code snippets
             </div>
         </div>
         
-        <div class="chat-section">
-            <h3>💬 Writing Assistant Chat</h3>
-            <div class="chat-messages" id="chatMessages">
-                <div class="chat-message assistant-message">
-                    <strong>Assistant:</strong> Hello! I'm here to help you write educational content. Ask me anything about book writing, content structure, or pedagogical approaches.
-                </div>
-            </div>
-            <div class="chat-input">
-                <input type="text" id="chatInput" placeholder="Ask me about book writing..." />
-                <button class="generate-btn" onclick="sendChatMessage()">Send</button>
-            </div>
-        </div>
     </div>
 
     <script>
@@ -2157,21 +2161,39 @@ Key steps or code snippets
         let currentFilename = '';
 
         function setContentType(type) {
-            document.getElementById('contentType').value = type;
+            const contentTypeSelect = document.getElementById('contentType');
+            if (contentTypeSelect) {
+                contentTypeSelect.value = type;
+            }
         }
 
         function generateContent() {
-            const type = document.getElementById('contentType').value;
-            const topic = document.getElementById('topic').value.trim();
-            const domain = document.getElementById('domain').value;
+            const typeSelect = document.getElementById('contentType');
+            const topicInput = document.getElementById('topic');
+            const domainSelect = document.getElementById('domain');
+            const contentBody = document.getElementById('contentBody');
+            const saveBtn = document.getElementById('saveBtn');
+
+            if (!typeSelect || !topicInput || !domainSelect) {
+                console.error('Required form elements not found');
+                return;
+            }
+
+            const type = typeSelect.value;
+            const topic = topicInput.value.trim();
+            const domain = domainSelect.value;
 
             if (!topic) {
                 alert('Please enter a topic');
                 return;
             }
 
-            document.getElementById('contentBody').innerHTML = '<div class="loading">🔄 Generating content...</div>';
-            document.getElementById('saveBtn').style.display = 'none';
+            if (contentBody) {
+                contentBody.innerHTML = '<div class="loading">🔄 Generating content...</div>';
+            }
+            if (saveBtn) {
+                saveBtn.style.display = 'none';
+            }
 
             vscode.postMessage({
                 command: 'generateContent',
@@ -2191,20 +2213,25 @@ Key steps or code snippets
             }
         }
 
-        function sendChatMessage() {
-            const input = document.getElementById('chatInput');
-            const message = input.value.trim();
+        // function sendChatMessage() {
+        //     const chatInput = document.getElementById('chatInput');
+        //     if (!chatInput) {
+        //         console.error('Chat input not found');
+        //         return;
+        //     }
             
-            if (!message) return;
+        //     const message = chatInput.value.trim();
+            
+        //     if (!message) return;
 
-            addChatMessage('user', message);
-            input.value = '';
+        //     addChatMessage('user', message);
+        //     chatInput.value = '';
 
-            vscode.postMessage({
-                command: 'sendMessage',
-                text: message
-            });
-        }
+        //     vscode.postMessage({
+        //         command: 'sendMessage',
+        //         text: message
+        //     });
+        // }
 
         function addChatMessage(sender, text) {
             const messagesContainer = document.getElementById('chatMessages');
@@ -2215,30 +2242,55 @@ Key steps or code snippets
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        // Handle Enter key in inputs
-        document.getElementById('topic').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') generateContent();
-        });
+        // Handle Enter key in inputs (with null checks)
+        const topicInput = document.getElementById('topic');
+        if (topicInput) {
+            topicInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') generateContent();
+            });
+        }
         
-        document.getElementById('chatInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendChatMessage();
-        });
+        // const chatInput = document.getElementById('chatInput');
+        // if (chatInput) {
+        //     chatInput.addEventListener('keypress', (e) => {
+        //         if (e.key === 'Enter') sendChatMessage();
+        //     });
+        // }
 
         // Listen for messages from the extension
         window.addEventListener('message', event => {
             const message = event.data;
+            console.log('Webview received message:', message.command, message);
             
             switch (message.command) {
                 case 'showLoading':
+                    console.log('Showing loading message');
                     document.getElementById('contentBody').innerHTML = \`<div class="loading">\${message.message}</div>\`;
                     break;
                     
                 case 'contentGenerated':
-                    currentContent = message.content;
-                    currentFilename = message.filename;
-                    document.getElementById('contentTitle').textContent = \`\${message.type.replace('-', ' ')} - \${currentFilename}\`;
-                    document.getElementById('contentBody').textContent = message.content;
-                    document.getElementById('saveBtn').style.display = 'block';
+                    console.log('Content generated, updating UI');
+                    try {
+                        currentContent = message.content;
+                        currentFilename = message.filename;
+                        
+                        const contentTitle = document.getElementById('contentTitle');
+                        const contentBody = document.getElementById('contentBody');
+                        const saveBtn = document.getElementById('saveBtn');
+                        
+                        if (contentTitle) {
+                            contentTitle.textContent = \`\${message.type.replace('-', ' ')} - \${currentFilename}\`;
+                        }
+                        if (contentBody) {
+                            contentBody.textContent = message.content;
+                        }
+                        if (saveBtn) {
+                            saveBtn.style.display = 'block';
+                        }
+                        console.log('UI updated successfully');
+                    } catch (error) {
+                        console.error('Error updating content UI:', error);
+                    }
                     break;
                     
                 case 'showError':
