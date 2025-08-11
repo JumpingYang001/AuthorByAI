@@ -30,6 +30,19 @@
         "category": "Book Writing"
       }
     ],
+    "keybindings": [
+      {
+        "command": "Author-AI-Assistant.createBookStructure",
+        "key": "ctrl+shift+b",
+        "mac": "cmd+shift+b",
+        "when": "!inDebugMode"
+      },
+      {
+        "command": "Author-AI-Assistant.openChatSidebar",
+        "key": "ctrl+shift+a",
+        "mac": "cmd+shift+a"
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {

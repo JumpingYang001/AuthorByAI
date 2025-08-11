@@ -33,6 +33,9 @@ export interface ContentGenerationRequest {
 export interface ContentRequest extends ContentGenerationRequest {
     contentType: string;
     context?: string;
+    suggestedFolder?: string;
+    suggestedFilename?: string;
+    bookProjectMode?: boolean;
 }
 
 export interface WebviewMessage {

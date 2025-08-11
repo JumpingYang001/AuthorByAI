@@ -104,7 +104,9 @@ export class BookWritingContentProvider implements vscode.WebviewViewProvider {
             // Give the panel a moment to initialize, then send the content
             setTimeout(() => {
                 if (BookWritingPanel.currentPanel) {
-                    BookWritingPanel.currentPanel.setGeneratedContent(content, request);
+                    // Enhanced content with suggested file location for book projects
+                    const enhancedRequest = this._enhanceRequestWithBookContext(request);
+                    BookWritingPanel.currentPanel.setGeneratedContent(content, enhancedRequest);
                 }
             }, 100);
 
@@ -124,6 +126,38 @@ export class BookWritingContentProvider implements vscode.WebviewViewProvider {
                 message: `❌ Failed to generate content: ${error}`
             });
         }
+    }
+
+    /**
+     * Enhances content request with book project context and suggested file locations
+     */
+    private _enhanceRequestWithBookContext(request: ContentRequest): ContentRequest {
+        const hasBookStructure = this._contextManager.getRecentContext('file_creation')
+            .some(activity => activity.details.includes('Created book structure'));
+        
+        if (hasBookStructure) {
+            // Suggest appropriate folder and filename based on content type
+            const folderMap: Record<string, string> = {
+                'chapter_outline': 'chapters',
+                'lesson_content': 'chapters',
+                'exercise': 'exercises',
+                'quiz': 'quizzes',
+                'summary': 'summaries'
+            };
+            
+            const suggestedFolder = folderMap[request.contentType] || '';
+            const sanitizedTopic = request.topic.replace(/[<>:"/\\|?*]/g, '-').toLowerCase();
+            const suggestedFilename = `${sanitizedTopic}.md`;
+            
+            return {
+                ...request,
+                suggestedFolder,
+                suggestedFilename,
+                bookProjectMode: true
+            };
+        }
+        
+        return request;
     }
 
     private _getContentGeneratorHtml(): string {

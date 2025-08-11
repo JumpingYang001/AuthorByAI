@@ -189,6 +189,15 @@ IMPORTANT:
 
     private async _getBookWritingResponse(userMessage: string): Promise<string> {
         const contextSummary = this._contextManager.getContextSummary();
+        const currentProject = this._contextManager.getCurrentProject();
+        
+        // Check if user has a book project set up
+        const hasBookStructure = this._contextManager.getRecentContext('file_creation')
+            .some(activity => activity.details.includes('Created book structure'));
+        
+        const projectInfo = hasBookStructure && currentProject.mainTopic 
+            ? `\n\nCURRENT BOOK PROJECT: "${currentProject.mainTopic}" in ${currentProject.domain}\nProject Structure: Complete book folder structure is set up and ready for content generation.`
+            : '';
         
         const enhancedPrompt = `You are a professional book writing assistant specializing in creating educational and training content. You help authors create structured learning materials including:
 
@@ -199,9 +208,11 @@ CONTENT TYPES YOU GENERATE:
 4. QUIZZES - Complete assessments with multiple choice, true/false, short answer, and practical questions plus full answer keys
 5. SUMMARIES - Comprehensive reviews with key concepts, terminology tables, best practices checklists, action items, and reflection questions
 
-${contextSummary}USER QUESTION: ${userMessage}
+${contextSummary}${projectInfo}
 
-CONTEXT AWARENESS: Use the session context above to provide relevant, informed responses. If the user is working on a specific topic/domain, reference it appropriately. If they've generated files, acknowledge their progress. Provide helpful, specific advice about book writing, content structure, pedagogical approaches, or how to use the content generation features effectively.`;
+USER QUESTION: ${userMessage}
+
+CONTEXT AWARENESS: Use the session context above to provide relevant, informed responses. If the user is working on a specific book project, reference it appropriately and suggest relevant content they could create. If they've generated files, acknowledge their progress. If they have a book structure set up, guide them on next steps for content creation. Provide helpful, specific advice about book writing, content structure, pedagogical approaches, or how to use the content generation features effectively.`;
         
         const response = await this._aiService.getResponse(enhancedPrompt, 'chat');
         return response.content;

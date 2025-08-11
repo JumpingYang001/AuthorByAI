@@ -66,7 +66,11 @@ export class BookStructureService {
                 `Book structure created successfully for "${bookTitle}"! Check your workspace for the new folders and files.`
             );
 
+            // Open the book outline file
             await this._openBookOutline(workspaceFolder.uri);
+
+            // Automatically open the Book Writing Assistant sidebar for immediate use
+            await this._openBookWritingSidebar();
 
         } catch (error) {
             console.error('Error creating book structure:', error);
@@ -327,10 +331,26 @@ By the end of this book, readers will be able to:
      */
     private async _updateSessionContext(bookTitle: string): Promise<void> {
         const sessionManager = SessionContextManager.getInstance();
+        
+        // Add the book creation activity
         sessionManager.addToContext('file_creation', `Created book structure for: ${bookTitle}`, {
             type: 'book_structure',
             title: bookTitle,
             timestamp: new Date().toISOString()
+        });
+
+        // Update the current project context to reflect the new book
+        const currentProject = sessionManager.getCurrentProject();
+        currentProject.mainTopic = bookTitle;
+        currentProject.domain = 'Educational Content';
+        currentProject.lastActivity = new Date();
+        
+        // Add initial context about the book project structure
+        sessionManager.addToContext('content_generation', `Book project "${bookTitle}" initialized with complete folder structure`, {
+            type: 'project_setup',
+            bookTitle: bookTitle,
+            folders: ['chapters', 'exercises', 'quizzes', 'summaries', 'assets', 'templates'],
+            files: ['README.md', 'book-outline.md']
         });
     }
 
@@ -341,5 +361,21 @@ By the end of this book, readers will be able to:
         const outlineUri = vscode.Uri.joinPath(baseUri, 'book-outline.md');
         const document = await vscode.workspace.openTextDocument(outlineUri);
         await vscode.window.showTextDocument(document);
+    }
+
+    /**
+     * Opens the Book Writing Assistant sidebar for immediate use
+     */
+    private async _openBookWritingSidebar(): Promise<void> {
+        // Open the Book Writing Assistant sidebar
+        await vscode.commands.executeCommand('workbench.view.extension.bookWriting');
+        
+        // Wait a moment for the sidebar to load, then show a helpful tip
+        setTimeout(() => {
+            vscode.window.showInformationMessage(
+                '📚 Book Writing Assistant sidebar is now open! Use the Content Generator to start creating chapters, exercises, and more.',
+                'Got it!'
+            );
+        }, 1000);
     }
 }
