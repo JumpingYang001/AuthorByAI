@@ -92,6 +92,12 @@ class SessionContextManager {
     public getCurrentProject() {
         return this._context.currentProject;
     }
+
+    public getRecentContext(actionType: 'content_generation' | 'file_creation' | 'chat'): Array<any> {
+        return this._context.recentActivities
+            .filter(activity => activity.action === actionType)
+            .slice(-3); // Get last 3 activities of this type
+    }
 }
 
 // Sidebar Chat Provider
@@ -142,15 +148,37 @@ class BookWritingChatProvider implements vscode.WebviewViewProvider {
                 text: '📝 Writing...'
             });
 
-            // Get AI response with full context awareness
-            const aiResponse = await this._getBookWritingResponse(userMessage);
+            // Check if this is a content modification request
+            const isModificationRequest = this._isContentModificationRequest(userMessage);
             
-            // Replace thinking message with actual response
-            this._view.webview.postMessage({
-                command: 'replaceChatMessage',
-                sender: 'assistant',
-                text: aiResponse
-            });
+            if (isModificationRequest && BookWritingPanel.currentPanel) {
+                // Handle content modification
+                const modifiedContent = await this._handleContentModification(userMessage);
+                
+                // Update the main panel with modified content
+                BookWritingPanel.currentPanel._panel.webview.postMessage({
+                    command: 'updateContent',
+                    content: modifiedContent,
+                    source: 'chat'
+                });
+                
+                // Send confirmation to chat
+                this._view.webview.postMessage({
+                    command: 'replaceChatMessage',
+                    sender: 'assistant',
+                    text: '✅ Content has been updated in the main panel based on your request!'
+                });
+            } else {
+                // Handle regular chat
+                const aiResponse = await this._getBookWritingResponse(userMessage);
+                
+                // Replace thinking message with actual response
+                this._view.webview.postMessage({
+                    command: 'replaceChatMessage',
+                    sender: 'assistant',
+                    text: aiResponse
+                });
+            }
         } catch (error) {
             console.log('AI not available, using fallback responses:', error);
             
@@ -161,6 +189,76 @@ class BookWritingChatProvider implements vscode.WebviewViewProvider {
                 sender: 'assistant',
                 text: smartResponse
             });
+        }
+    }
+
+    private _isContentModificationRequest(userMessage: string): boolean {
+        const modificationKeywords = [
+            'modify', 'change', 'update', 'edit', 'revise', 'improve', 'rewrite',
+            'add to', 'remove from', 'fix', 'correct', 'enhance', 'adjust',
+            'make it', 'can you', 'please change', 'update the content'
+        ];
+        
+        const lowerMessage = userMessage.toLowerCase();
+        return modificationKeywords.some(keyword => lowerMessage.includes(keyword));
+    }
+
+    private async _handleContentModification(userMessage: string): Promise<string> {
+        const contextSummary = this._contextManager.getContextSummary();
+        const currentProject = this._contextManager.getCurrentProject();
+        
+        // Get current content from the main panel if available
+        let currentContent = '';
+        if (BookWritingPanel.currentPanel?.currentContent) {
+            currentContent = BookWritingPanel.currentPanel.currentContent;
+        } else {
+            // Fallback: try to get info from recent context
+            const recentGeneration = this._contextManager.getRecentContext('content_generation');
+            if (recentGeneration.length > 0) {
+                currentContent = `[Previous content context: ${recentGeneration[0].details}]`;
+            }
+        }
+
+        if (!currentContent) {
+            throw new Error("No content available to modify. Please generate some content first.");
+        }
+
+        const modificationPrompt = `You are a professional content editor and book writing assistant. The user wants to modify existing content.
+
+${contextSummary}
+
+CURRENT PROJECT: ${currentProject.mainTopic ? `"${currentProject.mainTopic}" in ${currentProject.domain} domain` : 'No active project'}
+
+EXISTING CONTENT TO MODIFY:
+\`\`\`markdown
+${currentContent}
+\`\`\`
+
+USER MODIFICATION REQUEST: ${userMessage}
+
+TASK: Based on the user's request, generate the modified/updated content. Keep the same markdown structure and professional quality. Make only the changes requested while maintaining the overall coherence and educational value.
+
+IMPORTANT: 
+- Return ONLY the modified content in markdown format
+- Do not include explanations or meta-commentary
+- Maintain the same content type and structure unless specifically asked to change it
+- Ensure the modifications are pedagogically sound
+- Keep all the original formatting and structure unless specifically asked to change it
+- Make the requested changes while preserving the quality and educational value`;
+
+        try {
+            const modifiedContent = await this._getAIResponse(modificationPrompt);
+            
+            // Track the modification in context
+            this._contextManager.addToContext('content_generation', `Modified content based on: "${userMessage}"`, {
+                type: 'modification',
+                request: userMessage
+            });
+            
+            return modifiedContent;
+        } catch (error) {
+            console.log('Content modification failed:', error);
+            throw new Error(`Sorry, I couldn't modify the content. ${error}`);
         }
     }
 
@@ -769,10 +867,14 @@ class BookWritingPanel {
     public static currentPanel: BookWritingPanel | undefined;
     public static readonly viewType = 'bookWriting';
 
-    private readonly _panel: vscode.WebviewPanel;
+    public readonly _panel: vscode.WebviewPanel;
     private readonly _extensionUri: vscode.Uri;
     private _disposables: vscode.Disposable[] = [];
     private _contextManager = SessionContextManager.getInstance();
+    
+    // Track current content for cross-panel access
+    public currentContent: string = '';
+    public currentFilename: string = '';
 
     public static createOrShow(extensionUri: vscode.Uri) {
         const column = vscode.window.activeTextEditor
@@ -819,6 +921,9 @@ class BookWritingPanel {
                     case 'createMarkdownFile':
                         this._createMarkdownFile(message.filename, message.content);
                         return;
+                    case 'updateContent':
+                        this._handleContentUpdate(message.content, message.source);
+                        return;
                     // case 'sendMessage':
                     //     this._handleChatMessage(message.text);
                     //     return;
@@ -836,6 +941,23 @@ class BookWritingPanel {
     
     private _getContextSummary(): string {
         return this._contextManager.getContextSummary();
+    }
+
+    private _handleContentUpdate(content: string, source: string) {
+        try {
+            // Update tracked content
+            this.currentContent = content;
+            
+            // Track this modification in context
+            this._addToContext('content_generation', `Content updated via ${source}`, {
+                type: 'modification',
+                source
+            });
+            
+            console.log(`Content updated from ${source}, new length: ${content.length}`);
+        } catch (error) {
+            console.error('Failed to handle content update:', error);
+        }
     }
 
     // Method to set content type from sidebar
@@ -898,6 +1020,10 @@ class BookWritingPanel {
             }
 
             console.log(`Content generated successfully, length: ${content.length}`);
+
+            // Track current content for modification purposes
+            this.currentContent = content;
+            this.currentFilename = filename;
 
             // Send generated content back to webview
             const message = {
@@ -2290,6 +2416,26 @@ Key steps or code snippets
                         console.log('UI updated successfully');
                     } catch (error) {
                         console.error('Error updating content UI:', error);
+                    }
+                    break;
+                    
+                case 'updateContent':
+                    console.log('Updating content from', message.source);
+                    try {
+                        currentContent = message.content;
+                        
+                        const contentBody = document.getElementById('contentBody');
+                        const contentTitle = document.getElementById('contentTitle');
+                        
+                        if (contentBody) {
+                            contentBody.textContent = message.content;
+                        }
+                        if (contentTitle && message.source === 'chat') {
+                            contentTitle.textContent = contentTitle.textContent + ' (Modified via Chat)';
+                        }
+                        console.log('Content updated successfully from', message.source);
+                    } catch (error) {
+                        console.error('Error updating content:', error);
                     }
                     break;
                     
