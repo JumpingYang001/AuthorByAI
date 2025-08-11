@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import { SessionContextManager } from './sessionManager';
 import { AIService } from './aiService';
 import { TemplateService } from './templateService';
+import { BookStructureService } from './bookStructureService';
 import { ContentType, ContentGenerationRequest, WebviewMessage } from './types';
 
 // Import webview providers
@@ -30,9 +31,9 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     // Register command to create book structure
-    const createBookStructure = vscode.commands.registerCommand('Author-AI-Assistant.createBookStructure', () => {
-        // Create a basic book structure in the workspace
-        vscode.window.showInformationMessage('Book structure creation feature coming soon!');
+    const createBookStructure = vscode.commands.registerCommand('Author-AI-Assistant.createBookStructure', async () => {
+        const bookStructureService = BookStructureService.getInstance();
+        await bookStructureService.createBookStructure();
     });
 
     // Register command to open chat sidebar

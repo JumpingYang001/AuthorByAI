@@ -16,6 +16,7 @@ src/
 ├── aiService.ts             # AI integration (OpenAI, Claude, Local AI)
 ├── templateService.ts       # Template generation for fallback content
 ├── promptBuilder.ts         # Shared prompt utilities for AI content generation
+├── bookStructureService.ts  # Book project structure creation and management
 └── providers/               # Webview providers for UI components
     ├── chatProvider.ts      # Sidebar chat interface
     ├── contentProvider.ts   # Sidebar content generator
@@ -208,7 +209,42 @@ class PromptBuilder {
 - **Quality Assurance**: Professional educational content standards enforced
 - **Reduced Duplication**: Eliminates repeated prompt logic across providers
 
-### 7. `providers/chatProvider.ts` - Sidebar Chat Interface
+### 7. `bookStructureService.ts` - Book Project Management
+
+**Purpose**: Handles creation and management of book project structures in the workspace.
+
+**Key Features**:
+- **Interactive Setup**: Prompts user for book title and validates input
+- **Complete Structure Creation**: Creates organized folder hierarchy for book projects
+- **Template Generation**: Generates comprehensive README and book outline templates
+- **Session Integration**: Updates session context with project creation activities
+- **User Experience**: Automatically opens book outline after creation
+
+**Architecture Pattern**: Singleton Service
+
+```typescript
+class BookStructureService {
+    public static getInstance(): BookStructureService
+    public async createBookStructure(): Promise<void>
+    private async _promptForBookTitle(): Promise<string | undefined>
+    private async _createDirectories(baseUri: vscode.Uri): Promise<void>
+    private async _createInitialFiles(baseUri: vscode.Uri, bookTitle: string): Promise<void>
+    private _generateReadmeContent(bookTitle: string): string
+    private _generateBookOutlineContent(bookTitle: string): string
+}
+```
+
+**Generated Structure**:
+- **chapters/**: Main content chapters
+- **exercises/**: Hands-on activities and exercises
+- **quizzes/**: Assessment materials
+- **summaries/**: Chapter and section summaries
+- **assets/**: Images, code examples, and other resources
+- **templates/**: Reusable content templates
+- **README.md**: Project overview and usage instructions
+- **book-outline.md**: Comprehensive book structure template
+
+### 8. `providers/chatProvider.ts` - Sidebar Chat Interface
 
 **Purpose**: Interactive chat interface for book writing assistance and content modification.
 
