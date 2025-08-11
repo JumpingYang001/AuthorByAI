@@ -20,20 +20,6 @@
   "contributes": {
     "commands": [
       {
-        "command": "Author-AI-Assistant.helloWorld",
-        "title": "Hello World"
-      },
-      {
-        "command": "Author-AI-Assistant.openChat",
-        "title": "Open Book Writing Assistant",
-        "category": "Book Writing"
-      },
-      {
-        "command": "Author-AI-Assistant.openBookWriting",
-        "title": "Open Book Writing Assistant",
-        "category": "Book Writing"
-      },
-      {
         "command": "Author-AI-Assistant.createBookStructure",
         "title": "Create Book Structure",
         "category": "Book Writing"

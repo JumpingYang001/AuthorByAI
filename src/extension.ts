@@ -29,25 +29,20 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.registerWebviewViewProvider(BookWritingContentProvider.viewType, contentProvider)
     );
 
-    // Register command to open book writing assistant
-    const openBookWriting = vscode.commands.registerCommand('Author-AI-Assistant.openBookWriting', () => {
-        BookWritingPanel.createOrShow(context.extensionUri);
-    });
-
-    // Register legacy commands for backwards compatibility
-    const openChat = vscode.commands.registerCommand('Author-AI-Assistant.openChat', () => {
-        BookWritingPanel.createOrShow(context.extensionUri);
+    // Register command to create book structure
+    const createBookStructure = vscode.commands.registerCommand('Author-AI-Assistant.createBookStructure', () => {
+        // Create a basic book structure in the workspace
+        vscode.window.showInformationMessage('Book structure creation feature coming soon!');
     });
 
     // Register command to open chat sidebar
     const openChatSidebar = vscode.commands.registerCommand('Author-AI-Assistant.openChatSidebar', () => {
-        vscode.commands.executeCommand('workbench.view.extension.bookWritingView');
+        vscode.commands.executeCommand('workbench.view.extension.bookWriting');
     });
 
     // Add all commands to subscriptions
     context.subscriptions.push(
-        openBookWriting,
-        openChat,
+        createBookStructure,
         openChatSidebar
     );
 }
