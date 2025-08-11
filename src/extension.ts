@@ -148,7 +148,7 @@ function getCombinedHtml(chatProvider: BookWritingChatProvider): string {
             overflow-y: auto;
         }
 
-        /* Chat styles */
+        /* Chat styles - improved to match sidebar quality */
         .chat-container {
             display: flex;
             flex-direction: column;
@@ -160,13 +160,17 @@ function getCombinedHtml(chatProvider: BookWritingChatProvider): string {
             overflow-y: auto;
             margin-bottom: 15px;
             padding: 10px;
-            background: var(--vscode-textBlockQuote-background);
+            background: var(--vscode-sideBar-background);
             border-radius: 4px;
+            border: 1px solid var(--vscode-panel-border);
+            max-height: calc(100vh - 200px);
         }
 
         .chat-input {
             display: flex;
             gap: 10px;
+            padding: 10px 0;
+            border-top: 1px solid var(--vscode-panel-border);
         }
 
         .chat-input input {
@@ -176,6 +180,13 @@ function getCombinedHtml(chatProvider: BookWritingChatProvider): string {
             border-radius: 4px;
             background: var(--vscode-input-background);
             color: var(--vscode-input-foreground);
+            font-family: inherit;
+            font-size: 13px;
+        }
+
+        .chat-input input:focus {
+            outline: none;
+            border-color: var(--vscode-focusBorder);
         }
 
         .chat-input button {
@@ -185,23 +196,49 @@ function getCombinedHtml(chatProvider: BookWritingChatProvider): string {
             border: none;
             border-radius: 4px;
             cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
         }
 
-        /* Content generator styles - removed as no longer needed */
+        .chat-input button:hover {
+            background: var(--vscode-button-hoverBackground);
+        }
 
+        .chat-input button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Message styles - improved to match sidebar quality */
         .message {
-            margin-bottom: 10px;
+            margin-bottom: 12px;
             padding: 8px;
-            border-radius: 4px;
+            border-radius: 6px;
+            font-size: 13px;
+            line-height: 1.4;
         }
 
         .message.user {
-            background: var(--vscode-input-background);
-            text-align: right;
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            margin-left: 10px;
         }
 
         .message.assistant {
             background: var(--vscode-textBlockQuote-background);
+            margin-right: 10px;
+            border-left: 3px solid var(--vscode-textLink-foreground);
+            padding-left: 10px;
+        }
+
+        .welcome-message {
+            text-align: center;
+            color: var(--vscode-descriptionForeground);
+            font-size: 12px;
+            padding: 20px 10px;
+            border: 1px dashed var(--vscode-panel-border);
+            border-radius: 6px;
+            margin-bottom: 15px;
         }
 
         @media (max-width: 768px) {
@@ -223,8 +260,8 @@ function getCombinedHtml(chatProvider: BookWritingChatProvider): string {
             <div class="panel-content">
                 <div class="chat-container">
                     <div class="chat-messages" id="chatMessages">
-                        <div class="message assistant">
-                            Hello! I'm your Book Writing Assistant. Ask me anything about creating educational content, book structure, or writing techniques. Use the "Open Generator" button to create specific content types.
+                        <div class="welcome-message">
+                            👋 Hi! I'm your Book Writing Assistant. Ask me anything about creating educational content, book structure, or writing techniques. Use the "Open Generator" button to create specific content types.
                         </div>
                     </div>
                     <div class="chat-input">
@@ -265,7 +302,7 @@ function getCombinedHtml(chatProvider: BookWritingChatProvider): string {
             const messagesDiv = document.getElementById('chatMessages');
             const messageDiv = document.createElement('div');
             messageDiv.className = \`message \${sender}\`;
-            messageDiv.textContent = text;
+            messageDiv.innerHTML = \`<strong>\${sender.charAt(0).toUpperCase() + sender.slice(1)}:</strong> \${text}\`;
             messagesDiv.appendChild(messageDiv);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
@@ -276,15 +313,22 @@ function getCombinedHtml(chatProvider: BookWritingChatProvider): string {
             
             switch (message.command) {
                 case 'addChatMessage':
-                case 'replaceChatMessage':
                     addChatMessage(message.sender, message.text);
+                    break;
+                case 'replaceChatMessage':
+                    const messages = document.querySelectorAll('.message.assistant');
+                    if (messages.length > 0) {
+                        const lastMessage = messages[messages.length - 1];
+                        lastMessage.innerHTML = \`<strong>Assistant:</strong> \${message.text}\`;
+                    }
                     break;
             }
         });
 
         // Allow Enter key to send chat messages
         document.getElementById('chatInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
                 sendMessage();
             }
         });
