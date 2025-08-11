@@ -45,13 +45,14 @@ export class BookWritingContentProvider implements vscode.WebviewViewProvider {
         });
     }
 
-    private async _handleContentGeneration(request: ContentRequest): Promise<void> {
-        if (!this._view) {
+    public async _handleContentGeneration(request: ContentRequest, webview?: vscode.Webview): Promise<void> {
+        const targetWebview = webview || this._view?.webview;
+        if (!targetWebview) {
             return;
         }
 
         try {
-            this._view.webview.postMessage({
+            targetWebview.postMessage({
                 command: 'updateStatus',
                 status: 'generating',
                 message: `🤖 Generating ${request.contentType}...`
@@ -110,7 +111,7 @@ export class BookWritingContentProvider implements vscode.WebviewViewProvider {
                 }
             }, 100);
 
-            this._view.webview.postMessage({
+            targetWebview.postMessage({
                 command: 'contentGenerated',
                 content: content,
                 contentType: request.contentType,
@@ -120,7 +121,7 @@ export class BookWritingContentProvider implements vscode.WebviewViewProvider {
         } catch (error) {
             console.error('Content generation failed:', error);
             
-            this._view.webview.postMessage({
+            targetWebview.postMessage({
                 command: 'updateStatus',
                 status: 'error',
                 message: `❌ Failed to generate content: ${error}`
@@ -160,7 +161,7 @@ export class BookWritingContentProvider implements vscode.WebviewViewProvider {
         return request;
     }
 
-    private _getContentGeneratorHtml(): string {
+    public _getContentGeneratorHtml(): string {
         return `<!DOCTYPE html>
 <html lang="en">
 <head>

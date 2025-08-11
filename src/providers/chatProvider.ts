@@ -38,15 +38,16 @@ export class BookWritingChatProvider implements vscode.WebviewViewProvider {
         });
     }
 
-    private async _handleChatMessage(userMessage: string): Promise<void> {
-        if (!this._view) {
+    public async _handleChatMessage(userMessage: string, webview?: vscode.Webview): Promise<void> {
+        const targetWebview = webview || this._view?.webview;
+        if (!targetWebview) {
             return;
         }
 
         try {
             this._contextManager.addToContext('chat', `User asked: "${userMessage}"`);
 
-            this._view.webview.postMessage({
+            targetWebview.postMessage({
                 command: 'addChatMessage',
                 sender: 'assistant',
                 text: '📝 Writing...'
@@ -62,7 +63,7 @@ export class BookWritingChatProvider implements vscode.WebviewViewProvider {
                         const modifiedContent = await this._handleContentModification(userMessage);
                         
                         // Notify the main panel if it exists to update content
-                        this._view.webview.postMessage({
+                        targetWebview.postMessage({
                             command: 'replaceChatMessage',
                             sender: 'assistant',
                             text: '✅ Content has been modified based on your request! The updated content should be available in the main panel.'
@@ -73,14 +74,14 @@ export class BookWritingChatProvider implements vscode.WebviewViewProvider {
                         console.log('Modified content:', modifiedContent);
                         
                     } catch (modError) {
-                        this._view.webview.postMessage({
+                        targetWebview.postMessage({
                             command: 'replaceChatMessage',
                             sender: 'assistant',
                             text: `❌ ${modError}`
                         });
                     }
                 } else {
-                    this._view.webview.postMessage({
+                    targetWebview.postMessage({
                         command: 'replaceChatMessage',
                         sender: 'assistant',
                         text: '❌ No recent content found to modify. Please generate some content first using the Content Generator panel.'
@@ -89,7 +90,7 @@ export class BookWritingChatProvider implements vscode.WebviewViewProvider {
             } else {
                 const aiResponse = await this._getBookWritingResponse(userMessage);
                 
-                this._view.webview.postMessage({
+                targetWebview.postMessage({
                     command: 'replaceChatMessage',
                     sender: 'assistant',
                     text: aiResponse
@@ -100,7 +101,7 @@ export class BookWritingChatProvider implements vscode.WebviewViewProvider {
             
             const smartResponse = this._getBookWritingFallback(userMessage);
             
-            this._view.webview.postMessage({
+            targetWebview.postMessage({
                 command: 'replaceChatMessage',
                 sender: 'assistant',
                 text: smartResponse
@@ -267,7 +268,7 @@ Recent content: ${recentGeneration[0].details}`;
         return responses[Math.floor(Math.random() * responses.length)];
     }
 
-    private _getChatHtml(): string {
+    public _getChatHtml(): string {
         return `<!DOCTYPE html>
 <html lang="en">
 <head>

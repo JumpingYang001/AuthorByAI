@@ -28,6 +28,16 @@
         "command": "Author-AI-Assistant.openChatSidebar",
         "title": "$(comment-discussion) Book Writing Sidebar Chat",
         "category": "Book Writing"
+      },
+      {
+        "command": "Author-AI-Assistant.openChatPanel",
+        "title": "$(comment-discussion) Open Chat Panel (Right Side)",
+        "category": "Book Writing"
+      },
+      {
+        "command": "Author-AI-Assistant.openContentPanel",
+        "title": "$(file-text) Open Content Generator Panel (Right Side)",
+        "category": "Book Writing"
       }
     ],
     "keybindings": [
@@ -41,6 +51,16 @@
         "command": "Author-AI-Assistant.openChatSidebar",
         "key": "ctrl+shift+a",
         "mac": "cmd+shift+a"
+      },
+      {
+        "command": "Author-AI-Assistant.openChatPanel",
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c"
+      },
+      {
+        "command": "Author-AI-Assistant.openContentPanel",
+        "key": "ctrl+shift+g",
+        "mac": "cmd+shift+g"
       }
     ],
     "viewsContainers": {

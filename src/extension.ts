@@ -41,10 +41,66 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('workbench.view.extension.bookWriting');
     });
 
+    // Register command to open chat as floating panel (no Explorer conflict)
+    const openChatPanel = vscode.commands.registerCommand('Author-AI-Assistant.openChatPanel', () => {
+        // Create a floating chat panel
+        const panel = vscode.window.createWebviewPanel(
+            'bookWritingChat',
+            '💬 Book Writing Chat',
+            { viewColumn: vscode.ViewColumn.Beside, preserveFocus: false },
+            {
+                enableScripts: true,
+                localResourceRoots: [context.extensionUri]
+            }
+        );
+
+        // Set up the chat webview content using the same HTML as the sidebar
+        const chatProvider = new BookWritingChatProvider(context.extensionUri);
+        panel.webview.html = chatProvider._getChatHtml();
+        
+        // Handle messages from the webview
+        panel.webview.onDidReceiveMessage(async (data) => {
+            switch (data.command) {
+                case 'sendMessage':
+                    await chatProvider._handleChatMessage(data.text, panel.webview);
+                    break;
+            }
+        });
+    });
+
+    // Register command to open content generator as floating panel
+    const openContentPanel = vscode.commands.registerCommand('Author-AI-Assistant.openContentPanel', () => {
+        // Create a floating content generator panel
+        const panel = vscode.window.createWebviewPanel(
+            'bookWritingContent',
+            '📝 Content Generator',
+            { viewColumn: vscode.ViewColumn.Beside, preserveFocus: false },
+            {
+                enableScripts: true,
+                localResourceRoots: [context.extensionUri]
+            }
+        );
+
+        // Set up the content generator webview
+        const contentProvider = new BookWritingContentProvider(context.extensionUri);
+        panel.webview.html = contentProvider._getContentGeneratorHtml();
+        
+        // Handle messages from the webview
+        panel.webview.onDidReceiveMessage(async (message) => {
+            switch (message.command) {
+                case 'generateContent':
+                    await contentProvider._handleContentGeneration(message, panel.webview);
+                    break;
+            }
+        });
+    });
+
     // Add all commands to subscriptions
     context.subscriptions.push(
         createBookStructure,
-        openChatSidebar
+        openChatSidebar,
+        openChatPanel,
+        openContentPanel
     );
 }
 
