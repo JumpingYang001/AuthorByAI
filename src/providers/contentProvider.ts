@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { SessionContextManager } from '../sessionManager';
 import { TemplateService } from '../templateService';
+import { AIService } from '../aiService';
+import { PromptBuilder } from '../promptBuilder';
 import { Activity, ContentRequest, ContentType } from '../types';
 import { BookWritingPanel } from './mainPanel';
 
@@ -13,6 +15,7 @@ export class BookWritingContentProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
     private _contextManager = SessionContextManager.getInstance();
     private _templateService = TemplateService.getInstance();
+    private _aiService = AIService.getInstance();
     private _extensionUri: vscode.Uri;
 
     constructor(private readonly extensionUri: vscode.Uri) {
@@ -55,6 +58,7 @@ export class BookWritingContentProvider implements vscode.WebviewViewProvider {
             });
 
             let content: string;
+            let contentSource: string = 'template';
             let activity: Activity = {
                 action: 'content_generation',
                 type: 'content_generation',
@@ -62,14 +66,30 @@ export class BookWritingContentProvider implements vscode.WebviewViewProvider {
                 details: `Generated ${request.contentType} for topic: "${request.topic}"`
             };
 
-            // Use template service for consistent fallback
-            content = this._templateService.generateTemplate(request.contentType, {
-                topic: request.topic,
-                context: request.context || '',
-                domain: request.domain || 'General'
-            });
+            // First, try to use AI service
+            try {
+                const contextSummary = this._contextManager.getContextSummary();
+                const aiPrompt = PromptBuilder.buildContentGenerationPrompt(request, contextSummary);
+                
+                const aiResponse = await this._aiService.getResponse(aiPrompt, 'content');
+                content = aiResponse.content;
+                contentSource = aiResponse.source;
+                
+                activity.details += ` using ${contentSource}`;
+                
+            } catch (aiError) {
+                console.log('AI service unavailable, using template fallback:', aiError);
+                
+                // Fallback to template service
+                content = this._templateService.generateTemplate(request.contentType, {
+                    topic: request.topic,
+                    context: request.context || '',
+                    domain: request.domain || 'General'
+                });
+                
+                activity.details += ` (Template used - AI unavailable)`;
+            }
 
-            activity.details += ` (Template used - AI unavailable)`;
             this._contextManager.addToContext('content_generation', activity.details);
             
             this._contextManager.setCurrentProject({

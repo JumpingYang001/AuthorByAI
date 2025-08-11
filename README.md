@@ -15,6 +15,7 @@ src/
 ├── sessionManager.ts         # Session context and state management
 ├── aiService.ts             # AI integration (OpenAI, Claude, Local AI)
 ├── templateService.ts       # Template generation for fallback content
+├── promptBuilder.ts         # Shared prompt utilities for AI content generation
 └── providers/               # Webview providers for UI components
     ├── chatProvider.ts      # Sidebar chat interface
     ├── contentProvider.ts   # Sidebar content generator
@@ -174,7 +175,40 @@ class TemplateService {
 }
 ```
 
-### 6. `providers/chatProvider.ts` - Sidebar Chat Interface
+### 6. `promptBuilder.ts` - Shared Prompt Utilities
+
+**Purpose**: Centralized prompt engineering for consistent AI content generation across all providers.
+
+**Key Features**:
+- **Unified Prompt Structure**: Consistent AI prompting across all panels
+- **Content-Type Specific Instructions**: Detailed specifications for each content type
+- **Deduplication**: Single source of truth for prompt logic
+- **Professional Quality**: Ensures high-quality educational content generation
+
+**Architecture Pattern**: Static Utility Class
+
+```typescript
+class PromptBuilder {
+    public static buildContentGenerationPrompt(request: any, contextSummary: string): string
+    private static getContentTypeSpecificInstructions(contentType: string): string
+    private static readonly CONTENT_TYPE_DESCRIPTIONS: Record<string, string>
+}
+```
+
+**Content Type Instructions**:
+- **Chapter Outline**: Learning objectives, structured sections, assessment components
+- **Lesson Content**: Detailed explanations, examples, step-by-step instructions
+- **Exercise**: Progressive difficulty, practical activities, self-assessment
+- **Quiz**: Multiple question types, comprehensive answer keys
+- **Summary**: Key concepts, terminology, best practices checklists
+
+**Benefits of Centralization**:
+- **Consistency**: All AI calls use the same high-quality prompt structure
+- **Maintainability**: Single location for prompt improvements
+- **Quality Assurance**: Professional educational content standards enforced
+- **Reduced Duplication**: Eliminates repeated prompt logic across providers
+
+### 7. `providers/chatProvider.ts` - Sidebar Chat Interface
 
 **Purpose**: Interactive chat interface for book writing assistance and content modification.
 
@@ -204,12 +238,13 @@ User Input → Chat Provider → Detect Intent →
 └── General Chat → AI Service → Helpful Response
 ```
 
-### 7. `providers/contentProvider.ts` - Sidebar Content Generator
+### 8. `providers/contentProvider.ts` - Sidebar Content Generator
 
 **Purpose**: Quick content generation interface in the sidebar.
 
 **Key Features**:
 - **Quick Generation**: Simple form for rapid content creation
+- **Shared Prompt Logic**: Uses `PromptBuilder` for consistent AI prompting
 - **Template Integration**: Uses template service for reliable fallbacks
 - **Main Panel Integration**: Automatically opens main panel with generated content
 - **Project Context Updates**: Updates session context with new content
@@ -220,22 +255,24 @@ User Input → Chat Provider → Detect Intent →
 class BookWritingContentProvider implements vscode.WebviewViewProvider {
     public resolveWebviewView()
     private async _handleContentGeneration(request: ContentRequest)
+    // Uses: PromptBuilder.buildContentGenerationPrompt()
 }
 ```
 
 **Generation Flow**:
 ```
-User Form → Content Provider → Template Service → Generated Content → 
+User Form → Content Provider → PromptBuilder → AI Service → Generated Content → 
 Main Panel Opens → Content Displayed → Session Context Updated
 ```
 
-### 8. `providers/mainPanel.ts` - Main Content Panel
+### 9. `providers/mainPanel.ts` - Main Content Panel
 
 **Purpose**: Primary content editing and display interface.
 
 **Key Features**:
 - **Content Display**: Rich text display of generated content
 - **Content Editing**: Form interface for content generation parameters
+- **Shared Prompt Logic**: Uses `PromptBuilder` for consistent AI prompting
 - **File Management**: Save generated content as markdown files
 - **Cross-panel Communication**: Receives content from other providers
 
@@ -250,6 +287,7 @@ class BookWritingPanel {
     public setGeneratedContent(content: string, request: any)
     private async _handleContentGeneration(request: any)
     private async _saveContentToFile(content: string, filename: string)
+    // Uses: PromptBuilder.buildContentGenerationPrompt()
 }
 ```
 
@@ -259,24 +297,34 @@ class BookWritingPanel {
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ Content         │    │ Template        │    │ Main Panel      │
-│ Generator       │───►│ Service         │───►│ Display         │
+│ Content         │    │ Prompt Builder  │    │ AI Service      │
+│ Generator       │───►│ (Shared Logic)  │───►│                 │
 │ (Sidebar)       │    │                 │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          │              ┌─────────────────┐              │
-         └─────────────►│ Session Manager │◄─────────────┘
-                        │ (Context)       │
-                        └─────────────────┘
+         └─────────────►│ Session Manager │              │
+                        │ (Context)       │              │
+                        └─────────────────┘              │
+                                │                       │
+                       ┌─────────────────┐    ┌─────────────────┐
+                       │ Main Panel      │◄───│ Generated       │
+                       │ Display         │    │ Content         │
+                       └─────────────────┘    └─────────────────┘
 ```
 
 ### 2. AI Integration Flow
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ User Request    │    │ Session Manager │    │ AI Service      │
-│ (Any Provider)  │───►│ (Context)       │───►│                 │
+│ User Request    │    │ Session Manager │    │ Prompt Builder  │
+│ (Any Provider)  │───►│ (Context)       │───►│ (Shared Logic)  │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
+                                │                       │
+                                │              ┌─────────────────┐
+                                │              │ AI Service      │
+                                │              │ Multi-Provider  │
+                                │              └─────────────────┘
                                 │                       │
                                 │              ┌─────────────────┐
                                 │              │ OpenAI/Claude/  │
@@ -308,6 +356,25 @@ class BookWritingPanel {
                        └─────────────────┘
 ```
 
+### 4. Shared Prompt Logic Flow
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│ Content         │    │ Prompt Builder  │    │ AI Service      │
+│ Provider        │───►│ (Centralized)   │───►│ (Any Provider)  │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+┌─────────────────┐              │              ┌─────────────────┐
+│ Main Panel      │──────────────┘              │ Generated       │
+│ (Same Logic)    │                             │ Content         │
+└─────────────────┘                             └─────────────────┘
+         │                                               │
+┌─────────────────┐                                      │
+│ Chat Provider   │──────────────────────────────────────┘
+│ (Same Logic)    │          Consistent Quality
+└─────────────────┘
+```
+
 ### 4. Cross-Panel Communication
 
 ```
@@ -319,6 +386,11 @@ class BookWritingPanel {
          │                       │                       │
          └─────────────────────────────────────────────────┘
                     Session Manager (Shared Context)
+                            ↕
+                   ┌─────────────────┐
+                   │ Prompt Builder  │
+                   │ (Shared Logic)  │
+                   └─────────────────┘
 ```
 
 ## Development Patterns and Principles
@@ -334,6 +406,11 @@ class BookWritingPanel {
 - `SessionContextManager`: Single source of truth for session state
 - `AIService`: Unified AI interface
 - `TemplateService`: Centralized template generation
+
+#### Static Utility Pattern
+- `PromptBuilder`: Shared prompt engineering utilities
+- Centralized content type specifications
+- Deduplication of AI prompting logic
 
 #### Observer Pattern
 - Webview message passing between extension and UI
@@ -506,9 +583,10 @@ LOCAL_AI_URL=http://localhost:11434  # For Ollama
 
 ### 1. Adding New Content Types
 1. Update `ContentType` in `types.ts`
-2. Add template method in `templateService.ts`
-3. Update AI prompts in `aiService.ts`
-4. Add UI options in provider HTML
+2. Add content description in `promptBuilder.ts`
+3. Add content-specific instructions in `promptBuilder.ts`
+4. Add template method in `templateService.ts`
+5. Add UI options in provider HTML
 
 ### 2. Adding New AI Providers
 1. Add provider method in `aiService.ts`
@@ -516,7 +594,13 @@ LOCAL_AI_URL=http://localhost:11434  # For Ollama
 3. Add configuration in environment setup
 4. Update documentation
 
-### 3. Modifying UI Components
+### 3. Modifying Prompt Logic
+1. Update shared logic in `promptBuilder.ts`
+2. All providers automatically use updated prompts
+3. Test across all content generation interfaces
+4. Maintain consistency across all panels
+
+### 4. Modifying UI Components
 1. Update HTML in provider files
 2. Add message handlers for new interactions
 3. Update TypeScript interfaces if needed

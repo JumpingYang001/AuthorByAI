@@ -3,6 +3,7 @@ import * as path from 'path';
 import { SessionContextManager } from '../sessionManager';
 import { AIService } from '../aiService';
 import { TemplateService } from '../templateService';
+import { PromptBuilder } from '../promptBuilder';
 import { ContentType } from '../types';
 
 /**
@@ -78,13 +79,31 @@ export class BookWritingPanel {
             });
 
             let content: string;
+            let contentSource: string = 'template';
             
-            // Use template service for fallback
-            content = this._templateService.generateTemplate(request.contentType, {
-                topic: request.topic,
-                context: request.context || '',
-                domain: request.domain || 'General'
-            });
+            // First, try to use AI service
+            try {
+                const contextSummary = this._contextManager.getContextSummary();
+                const aiPrompt = PromptBuilder.buildContentGenerationPrompt(request, contextSummary);
+                
+                const aiResponse = await this._aiService.getResponse(aiPrompt, 'content');
+                content = aiResponse.content;
+                contentSource = aiResponse.source;
+                
+                this._contextManager.addToContext('content_generation', `Generated ${request.contentType} for topic: "${request.topic}" using ${contentSource}`);
+                
+            } catch (aiError) {
+                console.log('AI service unavailable, using template fallback:', aiError);
+                
+                // Fallback to template service
+                content = this._templateService.generateTemplate(request.contentType, {
+                    topic: request.topic,
+                    context: request.context || '',
+                    domain: request.domain || 'General'
+                });
+                
+                this._contextManager.addToContext('content_generation', `Generated ${request.contentType} for topic: "${request.topic}" using template fallback`);
+            }
 
             this.currentContent = content;
             
