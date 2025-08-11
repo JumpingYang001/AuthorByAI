@@ -819,9 +819,9 @@ class BookWritingPanel {
                     case 'createMarkdownFile':
                         this._createMarkdownFile(message.filename, message.content);
                         return;
-                    case 'sendMessage':
-                        this._handleChatMessage(message.text);
-                        return;
+                    // case 'sendMessage':
+                    //     this._handleChatMessage(message.text);
+                    //     return;
                 }
             },
             null,
@@ -952,39 +952,39 @@ class BookWritingPanel {
         }
     }
 
-    private async _handleChatMessage(userMessage: string) {
-        try {
-            // Track chat activity in context
-            this._addToContext('chat', `User asked: "${userMessage}"`);
+    // private async _handleChatMessage(userMessage: string) {
+    //     try {
+    //         // Track chat activity in context
+    //         this._addToContext('chat', `User asked: "${userMessage}"`);
 
-            // Show typing indicator
-            this._panel.webview.postMessage({
-                command: 'addChatMessage',
-                sender: 'assistant',
-                text: '📝 Writing...'
-            });
+    //         // Show typing indicator
+    //         this._panel.webview.postMessage({
+    //             command: 'addChatMessage',
+    //             sender: 'assistant',
+    //             text: '📝 Writing...'
+    //         });
 
-            // Get AI response with full context awareness
-            const aiResponse = await this._getBookWritingResponse(userMessage);
+    //         // Get AI response with full context awareness
+    //         const aiResponse = await this._getBookWritingResponse(userMessage);
             
-            // Replace thinking message with actual response
-            this._panel.webview.postMessage({
-                command: 'replaceChatMessage',
-                sender: 'assistant',
-                text: aiResponse
-            });
-        } catch (error) {
-            console.log('AI not available, using fallback responses:', error);
+    //         // Replace thinking message with actual response
+    //         this._panel.webview.postMessage({
+    //             command: 'replaceChatMessage',
+    //             sender: 'assistant',
+    //             text: aiResponse
+    //         });
+    //     } catch (error) {
+    //         console.log('AI not available, using fallback responses:', error);
             
-            const smartResponse = this._getBookWritingFallback(userMessage);
+    //         const smartResponse = this._getBookWritingFallback(userMessage);
             
-            this._panel.webview.postMessage({
-                command: 'replaceChatMessage',
-                sender: 'assistant',
-                text: smartResponse
-            });
-        }
-    }
+    //         this._panel.webview.postMessage({
+    //             command: 'replaceChatMessage',
+    //             sender: 'assistant',
+    //             text: smartResponse
+    //         });
+    //     }
+    // }
 
     // Content Generation Methods
     private async _generateChapterOutline(topic: string, domain: string): Promise<string> {
@@ -2233,14 +2233,14 @@ Key steps or code snippets
         //     });
         // }
 
-        function addChatMessage(sender, text) {
-            const messagesContainer = document.getElementById('chatMessages');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = \`chat-message \${sender}-message\`;
-            messageDiv.innerHTML = \`<strong>\${sender.charAt(0).toUpperCase() + sender.slice(1)}:</strong> \${text}\`;
-            messagesContainer.appendChild(messageDiv);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
+        // function addChatMessage(sender, text) {
+        //     const messagesContainer = document.getElementById('chatMessages');
+        //     const messageDiv = document.createElement('div');
+        //     messageDiv.className = \`chat-message \${sender}-message\`;
+        //     messageDiv.innerHTML = \`<strong>\${sender.charAt(0).toUpperCase() + sender.slice(1)}:</strong> \${text}\`;
+        //     messagesContainer.appendChild(messageDiv);
+        //     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        // }
 
         // Handle Enter key in inputs (with null checks)
         const topicInput = document.getElementById('topic');
@@ -2297,9 +2297,9 @@ Key steps or code snippets
                     document.getElementById('contentBody').innerHTML = \`<div class="error">\${message.message}</div>\`;
                     break;
                     
-                case 'addChatMessage':
-                    addChatMessage(message.sender, message.text);
-                    break;
+                // case 'addChatMessage':
+                //     addChatMessage(message.sender, message.text);
+                //     break;
                     
                 case 'replaceChatMessage':
                     const messages = document.querySelectorAll('.assistant-message');
