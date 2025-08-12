@@ -281,7 +281,7 @@ function renderMarkdownContent(text: string): string {
                 .replace(/(?<!&quot;&quot;)(&#39;[^&#39;]*&#39;|&quot;[^&quot;]*&quot;)(?!&quot;)/g, '<span style="color: #ce9178;">$1</span>');
         }
         
-        const codeBlockHtml = `<pre style="margin: 12px 0; padding: 16px; background: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border); border-radius: 8px; overflow-x: auto; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); max-width: 100%; box-sizing: border-box;"><code style="font-family: var(--vscode-editor-font-family, Consolas, Monaco, monospace); font-size: 14px; line-height: 1.6; color: var(--vscode-editor-foreground); white-space: pre-wrap;">${processedCode}</code></pre>`;
+        const codeBlockHtml = `<pre style="margin: 12px 0; padding: 16px; background: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border); border-radius: 8px; overflow-x: auto; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); max-width: 100%; box-sizing: border-box;"><code style="font-family: var(--vscode-editor-font-family, Consolas, Monaco, monospace); font-size: 14px; line-height: 1.6; color: var(--vscode-editor-foreground); white-space: pre-wrap; word-break: break-all; overflow-wrap: break-word;">${processedCode}</code></pre>`;
         
         const placeholder = '___CODE_BLOCK_' + codeBlocks.length + '___';
         codeBlocks.push(codeBlockHtml);
@@ -680,6 +680,8 @@ function getCombinedHtml(): string {
             overflow-x: auto;
             position: relative;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            max-width: 100%;
+            box-sizing: border-box;
         }
 
         .message-content pre code {
@@ -690,6 +692,9 @@ function getCombinedHtml(): string {
             font-size: 14px;
             line-height: 1.6;
             font-family: var(--vscode-editor-font-family, 'Consolas', 'Monaco', 'Courier New', monospace);
+            white-space: pre-wrap;
+            word-break: break-all;
+            overflow-wrap: break-word;
         }
 
         .code-block {
@@ -1051,7 +1056,7 @@ function getCombinedHtml(): string {
                             .replace(/(?<!&quot;&quot;)(&#39;[^&#39;]*&#39;|&quot;[^&quot;]*&quot;)(?!&quot;)/g, '<span style="color: #ce9178;">$1</span>');
                     }
                     
-                    const codeBlockHtml = '<pre style="margin: 12px 0; padding: 16px; background: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border); border-radius: 8px; overflow-x: auto; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);"><code style="font-family: var(--vscode-editor-font-family, Consolas, Monaco, monospace); font-size: 14px; line-height: 1.6; color: var(--vscode-editor-foreground); white-space: pre-wrap;">' + processedCode + '</code></pre>';
+                    const codeBlockHtml = '<pre style="margin: 12px 0; padding: 16px; background: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border); border-radius: 8px; overflow-x: auto; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); max-width: 100%; box-sizing: border-box;"><code style="font-family: var(--vscode-editor-font-family, Consolas, Monaco, monospace); font-size: 14px; line-height: 1.6; color: var(--vscode-editor-foreground); white-space: pre-wrap; word-break: break-all; overflow-wrap: break-word;">' + processedCode + '</code></pre>';
                     
                     const placeholder = '___CODE_BLOCK_' + codeBlocks.length + '___';
                     codeBlocks.push(codeBlockHtml);
