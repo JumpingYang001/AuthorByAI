@@ -254,7 +254,7 @@ function getCombinedHtml(chatProvider: BookWritingChatProvider): string {
         <!-- Chat Panel -->
         <div class="panel">
             <div class="panel-header">
-                <span>💬 Chat Assistant</span>
+                <span>💬 Writing Chat Assistant</span>
                 <button class="open-generator-btn" onclick="openContentGenerator()">📝 Open Generator</button>
             </div>
             <div class="panel-content">
