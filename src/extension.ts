@@ -193,6 +193,51 @@ function getFileExtension(language: string): string {
 }
 
 /**
+ * Simple markdown renderer for webview
+ */
+function renderMarkdownContent(text: string): string {
+    let html = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    
+    // Code blocks - handle triple backticks
+    html = html.replace(/```[\s\S]*?```/g, function(match) {
+        const content = match.replace(/```\w*\n?/, '').replace(/\n```$/, '');
+        return `<pre><code>${content.trim()}</code></pre>`;
+    });
+    
+    // Headers
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+    
+    // Bold and italic
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    
+    // Inline code
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    
+    // Blockquotes
+    html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+    
+    // Lists
+    html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+    html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+    
+    // Links
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+    
+    // Line breaks
+    html = html.replace(/\n/g, '<br>');
+    
+    return html;
+}
+
+/**
  * Creates combined HTML with chat interface and button to open main content generator panel
  */
 function getCombinedHtml(): string {
@@ -382,10 +427,30 @@ function getCombinedHtml(): string {
         }
 
         /* Markdown styles */
+        /* Enhanced header styles */
         .message-content h1, .message-content h2, .message-content h3,
         .message-content h4, .message-content h5, .message-content h6 {
-            margin: 8px 0 4px 0;
+            margin: 16px 0 8px 0;
             color: var(--vscode-foreground);
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .message-content h1 {
+            font-size: 1.5em;
+            border-bottom: 2px solid var(--vscode-textLink-foreground);
+            padding-bottom: 4px;
+        }
+
+        .message-content h2 {
+            font-size: 1.3em;
+            border-bottom: 1px solid rgba(128, 128, 128, 0.3);
+            padding-bottom: 2px;
+        }
+
+        .message-content h3 {
+            font-size: 1.1em;
+            color: var(--vscode-textLink-foreground);
         }
 
         .message-content p {
@@ -410,28 +475,36 @@ function getCombinedHtml(): string {
         }
 
         /* Code styles */
+        /* Enhanced Code styles for better appearance */
         .message-content code {
             background: var(--vscode-textCodeBlock-background);
             color: var(--vscode-textPreformat-foreground);
-            padding: 2px 4px;
-            border-radius: 3px;
-            font-family: var(--vscode-editor-font-family);
-            font-size: 12px;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-family: var(--vscode-editor-font-family, 'Consolas', 'Monaco', 'Courier New', monospace);
+            font-size: 13px;
+            border: 1px solid rgba(128, 128, 128, 0.2);
         }
 
         .message-content pre {
-            margin: 8px 0;
-            padding: 12px;
-            background: var(--vscode-textCodeBlock-background);
-            border-radius: 6px;
+            margin: 12px 0;
+            padding: 16px;
+            background: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 8px;
             overflow-x: auto;
             position: relative;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .message-content pre code {
             background: none;
             padding: 0;
+            border: none;
             color: var(--vscode-editor-foreground);
+            font-size: 14px;
+            line-height: 1.6;
+            font-family: var(--vscode-editor-font-family, 'Consolas', 'Monaco', 'Courier New', monospace);
         }
 
         .code-block {
@@ -717,27 +790,6 @@ function getCombinedHtml(): string {
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
             }
 
-            function renderMarkdown(text) {
-                // Simple markdown rendering - keep it basic for webview
-                let html = escapeHtml(text);
-                
-                // Headers
-                html = html.replace(/### (.+)/g, '<h3>$1</h3>');
-                html = html.replace(/## (.+)/g, '<h2>$1</h2>');
-                html = html.replace(/# (.+)/g, '<h1>$1</h1>');
-                
-                // Bold text
-                html = html.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
-                
-                // Inline code
-                html = html.replace(/\\\`(.+?)\\\`/g, '<code>$1</code>');
-                
-                // Line breaks
-                html = html.replace(/\\n/g, '<br>');
-                
-                return html;
-            }
-
             function escapeHtml(unsafe) {
                 return unsafe
                     .replace(/&/g, "&amp;")
@@ -745,6 +797,94 @@ function getCombinedHtml(): string {
                     .replace(/>/g, "&gt;")
                     .replace(/"/g, "&quot;")
                     .replace(/'/g, "&#039;");
+            }
+
+            function renderMarkdown(text) {
+                // Enhanced markdown renderer with proper line break handling
+                let html = text;
+                
+                // Code blocks with syntax highlighting - handle these first
+                const bt = String.fromCharCode(96); // backtick character
+                const codeBlockRegex = new RegExp(bt + bt + bt + '([\\\\w]*)\\\\n?([\\\\s\\\\S]*?)\\\\n?' + bt + bt + bt, 'g');
+                
+                // Store code blocks with placeholders to protect them from line break processing
+                const codeBlocks = [];
+                
+                html = html.replace(codeBlockRegex, function(match, language, code) {
+                    const lang = language || 'text';
+                    let processedCode = code.trim();
+                    
+                    // Escape HTML first, but preserve actual newlines in code
+                    processedCode = processedCode
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/'/g, '&#39;');
+                    
+                    // Add syntax highlighting for Python after escaping
+                    if (lang.toLowerCase() === 'python') {
+                        processedCode = processedCode
+                            // Python docstrings (triple quotes) - must come before single quotes
+                            .replace(/(&quot;&quot;&quot;[\\s\\S]*?&quot;&quot;&quot;|&#39;&#39;&#39;[\\s\\S]*?&#39;&#39;&#39;)/g, '<span style="color: #608b4e; font-style: italic;">$1</span>')
+                            // Python keywords
+                            .replace(/\\b(def|class|if|else|elif|for|while|return|import|from|try|except|with|as|in)\\b/g, '<span style="color: #569cd6; font-weight: bold;">$1</span>')
+                            // Python types and constants
+                            .replace(/\\b(str|int|float|bool|list|dict|tuple|None|True|False)\\b/g, '<span style="color: #4ec9b0;">$1</span>')
+                            // Single line comments (lines starting with #)
+                            .replace(/^(\\s*#.*$)/gm, '<span style="color: #608b4e; font-style: italic;">$1</span>')
+                            // Regular strings (single and double quotes, but not docstrings)
+                            .replace(/(?<!&quot;&quot;)(&#39;[^&#39;]*&#39;|&quot;[^&quot;]*&quot;)(?!&quot;)/g, '<span style="color: #ce9178;">$1</span>');
+                    }
+                    
+                    const codeBlockHtml = '<pre style="margin: 12px 0; padding: 16px; background: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border); border-radius: 8px; overflow-x: auto; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);"><code style="font-family: var(--vscode-editor-font-family, Consolas, Monaco, monospace); font-size: 14px; line-height: 1.6; color: var(--vscode-editor-foreground); white-space: pre-wrap;">' + processedCode + '</code></pre>';
+                    
+                    const placeholder = '___CODE_BLOCK_' + codeBlocks.length + '___';
+                    codeBlocks.push(codeBlockHtml);
+                    return placeholder;
+                });
+                
+                // Now escape HTML for the rest of the content (outside code blocks)
+                html = html
+                    .replace(/&(?!amp;|lt;|gt;|quot;|#39;)/g, '&amp;')
+                    .replace(/<(?!\\/?(span|pre|code|h[1-6]|strong|em|ul|ol|li|blockquote|a)\\b[^>]*>)/g, '&lt;')
+                    .replace(/>(?![^<]*<\\/(span|pre|code|h[1-6]|strong|em|ul|ol|li|blockquote|a)>)/g, '&gt;');
+                
+                // Headers with enhanced styling
+                html = html.replace(/^### (.+)$/gm, '<h3 style="font-size: 1.1em; font-weight: 600; margin: 16px 0 8px 0; color: var(--vscode-textLink-foreground); line-height: 1.3;">$1</h3>');
+                html = html.replace(/^## (.+)$/gm, '<h2 style="font-size: 1.3em; font-weight: 600; margin: 16px 0 8px 0; color: var(--vscode-foreground); border-bottom: 1px solid rgba(128, 128, 128, 0.3); padding-bottom: 2px; line-height: 1.3;">$1</h2>');
+                html = html.replace(/^# (.+)$/gm, '<h1 style="font-size: 1.5em; font-weight: 600; margin: 16px 0 8px 0; color: var(--vscode-foreground); border-bottom: 2px solid var(--vscode-textLink-foreground); padding-bottom: 4px; line-height: 1.3;">$1</h1>');
+                
+                // Enhanced text formatting
+                html = html.replace(/\\*\\*(.+?)\\*\\*/g, '<strong style="font-weight: 600;">$1</strong>');
+                html = html.replace(/(?<!\\*)\\*(.+?)\\*(?!\\*)/g, '<em style="font-style: italic;">$1</em>');
+                
+                // Enhanced inline code (avoid conflicts with existing code blocks)
+                const inlineCodeRegex = new RegExp('(?<!<code[^>]*>)' + bt + '([^' + bt + ']+)' + bt + '(?![^<]*</code>)', 'g');
+                html = html.replace(inlineCodeRegex, '<code style="background: var(--vscode-textCodeBlock-background); color: var(--vscode-textPreformat-foreground); padding: 3px 6px; border-radius: 4px; font-family: var(--vscode-editor-font-family, Consolas, Monaco, monospace); font-size: 13px; border: 1px solid rgba(128, 128, 128, 0.2);">$1</code>');
+                
+                // Enhanced blockquotes
+                html = html.replace(/^> (.+)$/gm, '<blockquote style="margin: 12px 0; padding: 12px 16px; border-left: 4px solid var(--vscode-textLink-foreground); background: var(--vscode-textBlockQuote-background); font-style: italic; border-radius: 0 4px 4px 0;">$1</blockquote>');
+                
+                // Enhanced lists
+                html = html.replace(/^- (.+)$/gm, '<li style="margin: 4px 0; line-height: 1.5;">$1</li>');
+                html = html.replace(/^\\d+\\. (.+)$/gm, '<li style="margin: 4px 0; line-height: 1.5;">$1</li>');
+                
+                // Wrap consecutive <li> elements in <ul> tags
+                html = html.replace(/(<li[^>]*>.*?<\\/li>\\s*)+/g, '<ul style="margin: 8px 0; padding-left: 24px; list-style-type: disc;">$&</ul>');
+                
+                // Enhanced links
+                html = html.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="$2" target="_blank" style="color: var(--vscode-textLink-foreground); text-decoration: underline;">$1</a>');
+                
+                // Line breaks for non-code content only (after code blocks are protected)
+                html = html.replace(/\\n/g, '<br>');
+                
+                // Restore code blocks (this happens after line break processing)
+                codeBlocks.forEach((block, index) => {
+                    html = html.replace('___CODE_BLOCK_' + index + '___', block);
+                });
+                
+                return html;
             }
 
             function replaceChatMessage(messageId, content, isMarkdown = false) {
@@ -930,7 +1070,7 @@ CONTEXT AWARENESS: Provide helpful, specific advice about book writing, content 
                 command: 'replaceMessage',
                 messageId: thinkingMessageId,
                 content: fallbackResponse,
-                isMarkdown: false
+                isMarkdown: true
             });
         }
         
@@ -954,7 +1094,97 @@ function getCombinedPanelFallback(userMessage: string, contextManager: any): str
     const project = contextManager.getCurrentProject();
     const hasProject = project.mainTopic && project.domain;
     
-    // Context-aware responses
+    // Specific test message responses
+    if (lowerMessage.includes('python function') || lowerMessage.includes('show me a python')) {
+        return `# Python Function Example
+
+Here's a useful Python function for organizing book chapters:
+
+\`\`\`python
+def create_chapter_outline(title, sections):
+    """
+    Create a structured chapter outline for educational content.
+    
+    Args:
+        title (str): The chapter title
+        sections (list): List of section names
+    
+    Returns:
+        dict: Structured chapter data
+    """
+    chapter = {
+        'title': title,
+        'sections': [],
+        'word_count': 0,
+        'exercises': []
+    }
+    
+    for i, section in enumerate(sections, 1):
+        chapter['sections'].append({
+            'number': i,
+            'title': section,
+            'content': '',
+            'learning_objectives': []
+        })
+    
+    return chapter
+
+# Example usage
+chapter = create_chapter_outline(
+    "Introduction to Programming", 
+    ["Variables", "Functions", "Loops", "Exercises"]
+)
+print(f"Created chapter: {chapter['title']}")
+\`\`\`
+
+This function helps organize educational content systematically.`;
+    }
+    
+    if (lowerMessage.includes('markdown formatting') || lowerMessage.includes('markdown examples')) {
+        return `# Markdown Formatting Guide
+
+Here are **essential markdown elements** for book writing:
+
+## Headers
+Use different levels:
+### Subsection
+#### Sub-subsection
+
+## Text Formatting
+- **Bold text** for emphasis
+- *Italic text* for subtle emphasis
+- \`inline code\` for technical terms
+- ~~strikethrough~~ for corrections
+
+## Lists
+### Numbered List:
+1. First chapter concept
+2. Second chapter concept
+3. Third chapter concept
+
+### Bullet Points:
+- Key learning objective
+- Supporting material
+- Practice exercises
+
+## Code Blocks
+\`\`\`javascript
+function generateContent(topic) {
+    return \`Creating content about \${topic}\`;
+}
+\`\`\`
+
+## Blockquotes
+> This is an important note for students
+> that spans multiple lines
+
+## Links and References
+[VS Code Documentation](https://code.visualstudio.com/docs)
+
+**Try the Insert button** to add this formatting to your document!`;
+    }
+    
+    // Context-aware responses for existing project
     if (hasProject) {
         if (lowerMessage.includes('outline') || lowerMessage.includes('structure')) {
             return `💡 Create chapter outlines for your ${project.domain} book about "${project.mainTopic}" using the Content Generator panel.`;
@@ -969,6 +1199,7 @@ function getCombinedPanelFallback(userMessage: string, contextManager: any): str
         }
     }
 
+    // General fallback responses
     const responses = hasProject ? [
         `📚 Working on "${project.mainTopic}" in ${project.domain}! How can I help with your book?`,
         `✨ Great progress on your ${project.domain} content! What would you like to create next?`,

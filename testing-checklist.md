@@ -39,8 +39,8 @@
 ## Test Messages to Try:
 1. "hello" - Basic response
 2. "How do I write a book outline?" - Structured content
-3. "Show me a Python function" - Code example
-4. "Give me markdown formatting examples" - Test rendering
+3. "Show me a Python function" - **Code example with syntax highlighting**
+4. "Give me markdown formatting examples" - **Test rendering & formatting**
 5. "Create lesson plan structure" - Educational content
 
 ## Expected Behaviors:
@@ -48,3 +48,14 @@
 - Assistant messages: Markdown rendered, left-aligned, bot icon, action buttons
 - Code blocks: Syntax highlighting, copy/insert/create file buttons
 - UI: Copilot-like appearance, smooth interactions
+
+## New Test Templates Added:
+### Python Function Test:
+- **Trigger**: "Show me a Python function" or "python function"
+- **Expected**: Multi-line Python code block with syntax highlighting
+- **Features to test**: Copy code, Insert code, Create file buttons
+
+### Markdown Formatting Test:
+- **Trigger**: "Give me markdown formatting examples" or "markdown formatting"
+- **Expected**: Headers, bold, italic, code, lists, blockquotes
+- **Features to test**: Proper HTML rendering, Insert button for formatted content
