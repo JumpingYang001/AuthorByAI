@@ -7,6 +7,7 @@ import { SessionContextManager } from './sessionManager';
 import { AIService } from './aiService';
 import { TemplateService } from './templateService';
 import { BookStructureService } from './bookStructureService';
+import { ConversationStorage } from './conversationStorage';
 import { ContentType, ContentGenerationRequest, WebviewMessage } from './types';
 
 // Import webview providers
@@ -15,6 +16,9 @@ import { BookWritingPanel } from './providers/mainPanel';
 // This method is called when your extension is activated
 export function activate(context: vscode.ExtensionContext) {
     console.log('Book Writing Assistant extension is now active!');
+
+    // Initialize conversation storage
+    ConversationStorage.getInstance(context);
 
     // Register command to create book structure
     const createBookStructure = vscode.commands.registerCommand('Author-AI-Assistant.createBookStructure', async () => {
@@ -147,10 +151,34 @@ export function activate(context: vscode.ExtensionContext) {
         });
     });
 
+    // Register command to clear conversation history
+    const clearConversation = vscode.commands.registerCommand('Author-AI-Assistant.clearConversation', async () => {
+        const conversationStorage = ConversationStorage.getInstance();
+        const stats = conversationStorage.getStats();
+        
+        if (stats.totalMessages === 0) {
+            vscode.window.showInformationMessage('💬 No conversation history to clear');
+            return;
+        }
+        
+        const choice = await vscode.window.showWarningMessage(
+            `Clear conversation history? This will delete ${stats.totalMessages} messages permanently.`,
+            { modal: true },
+            'Clear History',
+            'Cancel'
+        );
+        
+        if (choice === 'Clear History') {
+            conversationStorage.clearConversation();
+            vscode.window.showInformationMessage('✅ Conversation history cleared');
+        }
+    });
+
     // Add all commands to subscriptions
     context.subscriptions.push(
         createBookStructure,
-        openBookWritingPanel
+        openBookWritingPanel,
+        clearConversation
     );
 }
 
@@ -238,9 +266,58 @@ function renderMarkdownContent(text: string): string {
 }
 
 /**
+ * Escape HTML characters for safe display
+ */
+function escapeHtmlInTs(unsafe: string): string {
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+/**
  * Creates combined HTML with chat interface and button to open main content generator panel
  */
 function getCombinedHtml(): string {
+    // Get saved conversation history
+    const conversationStorage = ConversationStorage.getInstance();
+    const savedMessages = conversationStorage.getConversation();
+    
+    // Generate HTML for saved messages
+    const messagesHtml = savedMessages.map(msg => {
+        const timeStr = new Date(msg.timestamp).toLocaleTimeString();
+        const isUser = msg.role === 'user';
+        
+        if (isUser) {
+            return `
+                <div class="message user">
+                    <div class="message-content">
+                        <div class="message-text">${escapeHtmlInTs(msg.content)}</div>
+                        <div class="message-time">${timeStr}</div>
+                    </div>
+                    <div class="message-avatar">👤</div>
+                </div>`;
+        } else {
+            const content = msg.isMarkdown ? renderMarkdownContent(msg.content) : escapeHtmlInTs(msg.content);
+            return `
+                <div class="message assistant" data-message-id="${msg.id}">
+                    <div class="message-avatar">🤖</div>
+                    <div class="message-content">
+                        <div class="message-text">${content}</div>
+                        <div class="message-footer">
+                            <div class="message-actions">
+                                <button class="action-btn copy-btn" data-message-id="${msg.id}" title="Copy message">📋</button>
+                                <button class="action-btn insert-btn" data-message-id="${msg.id}" title="Insert into editor">📝</button>
+                            </div>
+                            <div class="message-time">${timeStr}</div>
+                        </div>
+                    </div>
+                </div>`;
+        }
+    }).join('');
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -321,6 +398,9 @@ function getCombinedHtml(): string {
             border-radius: 4px;
             border: 1px solid var(--vscode-panel-border);
             max-height: calc(100vh - 200px);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
 
         .chat-input {
@@ -374,6 +454,9 @@ function getCombinedHtml(): string {
             font-size: 13px;
             line-height: 1.5;
             position: relative;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
         }
 
         .message-header {
@@ -394,6 +477,19 @@ function getCombinedHtml(): string {
 
         .message:hover .message-actions {
             opacity: 1;
+        }
+
+        .message-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            opacity: 0.7;
         }
 
         .action-btn {
@@ -417,13 +513,30 @@ function getCombinedHtml(): string {
         .message.user {
             background: var(--vscode-button-background);
             color: var(--vscode-button-foreground);
-            margin-left: 20px;
+            margin-left: auto;
+            margin-right: 10px;
+            max-width: 70%;
+            align-self: flex-end;
+            flex-direction: row-reverse;
         }
 
         .message.assistant {
             background: var(--vscode-textBlockQuote-background);
-            margin-right: 20px;
+            margin-right: auto;
+            margin-left: 10px;
+            max-width: 85%;
             border-left: 3px solid var(--vscode-textLink-foreground);
+            align-self: flex-start;
+        }
+
+        .message-avatar {
+            font-size: 16px;
+            flex-shrink: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         /* Markdown styles */
@@ -588,9 +701,10 @@ function getCombinedHtml(): string {
             <div class="panel-content">
                 <div class="chat-container">
                     <div class="chat-messages" id="chatMessages">
+                        ${savedMessages.length === 0 ? `
                         <div class="welcome-message">
                             👋 Hi! I'm your Book Writing Assistant. Ask me anything about creating educational content, book structure, or writing techniques. Use the "Open Generator" button to create specific content types.
-                        </div>
+                        </div>` : messagesHtml}
                     </div>
                     <div class="chat-input">
                         <input type="text" id="chatInput" placeholder="Ask me anything about book writing..." />
@@ -765,25 +879,31 @@ function getCombinedHtml(): string {
                     messageDiv.setAttribute('data-message-id', messageId);
                 }
 
+                const timeStr = new Date().toLocaleTimeString();
+
                 if (sender === 'assistant') {
                     const renderedContent = renderMarkdown(text);
                     const currentMessageId = messageId || 'msg-' + Date.now();
                     messageDiv.setAttribute('data-message-id', currentMessageId);
                     messageDiv.innerHTML = 
-                        '<div class="message-header">' +
-                            '<span>🤖 Assistant</span>' +
-                            '<div class="message-actions">' +
-                                '<button class="action-btn copy-btn" data-message-id="' + currentMessageId + '">📋 Copy</button>' +
-                                '<button class="action-btn insert-btn" data-message-id="' + currentMessageId + '">📝 Insert</button>' +
+                        '<div class="message-avatar">🤖</div>' +
+                        '<div class="message-content">' +
+                            '<div class="message-text">' + renderedContent + '</div>' +
+                            '<div class="message-footer">' +
+                                '<div class="message-actions">' +
+                                    '<button class="action-btn copy-btn" data-message-id="' + currentMessageId + '">📋</button>' +
+                                    '<button class="action-btn insert-btn" data-message-id="' + currentMessageId + '">📝</button>' +
+                                '</div>' +
+                                '<div class="message-time">' + timeStr + '</div>' +
                             '</div>' +
-                        '</div>' +
-                        '<div class="message-content">' + renderedContent + '</div>';
+                        '</div>';
                 } else {
                     messageDiv.innerHTML = 
-                        '<div class="message-header">' +
-                            '<span>👤 You</span>' +
+                        '<div class="message-content">' +
+                            '<div class="message-text">' + escapeHtml(text) + '</div>' +
+                            '<div class="message-time">' + timeStr + '</div>' +
                         '</div>' +
-                        '<div class="message-content">' + escapeHtml(text) + '</div>';
+                        '<div class="message-avatar">👤</div>';
                 }
                 
                 messagesDiv.appendChild(messageDiv);
@@ -906,15 +1026,19 @@ function getCombinedHtml(): string {
                     const currentMessageId = targetMessage.getAttribute('data-message-id') || ('msg-' + Date.now());
                     targetMessage.setAttribute('data-message-id', currentMessageId);
                     const renderedContent = isMarkdown ? renderMarkdown(content) : escapeHtml(content);
+                    const timeStr = new Date().toLocaleTimeString();
                     targetMessage.innerHTML = 
-                        '<div class="message-header">' +
-                            '<span>🤖 Assistant</span>' +
-                            '<div class="message-actions">' +
-                                '<button class="action-btn copy-btn" data-message-id="' + currentMessageId + '">📋 Copy</button>' +
-                                '<button class="action-btn insert-btn" data-message-id="' + currentMessageId + '">📝 Insert</button>' +
+                        '<div class="message-avatar">🤖</div>' +
+                        '<div class="message-content">' +
+                            '<div class="message-text">' + renderedContent + '</div>' +
+                            '<div class="message-footer">' +
+                                '<div class="message-actions">' +
+                                    '<button class="action-btn copy-btn" data-message-id="' + currentMessageId + '">📋</button>' +
+                                    '<button class="action-btn insert-btn" data-message-id="' + currentMessageId + '">📝</button>' +
+                                '</div>' +
+                                '<div class="message-time">' + timeStr + '</div>' +
                             '</div>' +
-                        '</div>' +
-                        '<div class="message-content">' + renderedContent + '</div>';
+                        '</div>';
                 } else {
                     // Fallback: create new message if no existing message to replace
                     addChatMessage('assistant', content);
@@ -956,6 +1080,12 @@ function getCombinedHtml(): string {
             }
 
             function setupEventListeners() {
+                // Auto-scroll to latest messages on load
+                const messagesDiv = document.getElementById('chatMessages');
+                if (messagesDiv) {
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                }
+
                 // Send button click
                 const sendButton = document.getElementById('sendButton');
                 if (sendButton) {
@@ -1017,6 +1147,10 @@ async function handleCombinedPanelChat(userMessage: string, webview: vscode.Webv
         
         const contextManager = SessionContextManager.getInstance();
         const aiService = AIService.getInstance();
+        const conversationStorage = ConversationStorage.getInstance();
+        
+        // Save user message to conversation storage
+        conversationStorage.addMessage('user', userMessage, false);
         
         // Add to context
         contextManager.addToContext('chat', `User asked: "${userMessage}"`);
@@ -1052,6 +1186,9 @@ CONTEXT AWARENESS: Provide helpful, specific advice about book writing, content 
             
             const response = await aiService.getResponse(enhancedPrompt, 'chat');
             
+            // Save assistant response to conversation storage
+            conversationStorage.addMessage('assistant', response.content, true);
+            
             // Replace thinking message with AI response
             webview.postMessage({
                 command: 'replaceMessage',
@@ -1065,6 +1202,9 @@ CONTEXT AWARENESS: Provide helpful, specific advice about book writing, content 
             
             // Use fallback response
             const fallbackResponse = getCombinedPanelFallback(userMessage, contextManager);
+            
+            // Save fallback response to conversation storage
+            conversationStorage.addMessage('assistant', fallbackResponse, true);
             
             webview.postMessage({
                 command: 'replaceMessage',
@@ -1095,7 +1235,7 @@ function getCombinedPanelFallback(userMessage: string, contextManager: any): str
     const hasProject = project.mainTopic && project.domain;
     
     // Specific test message responses
-    if (lowerMessage.includes('python function') || lowerMessage.includes('show me a python')) {
+    if (lowerMessage.includes('python') && (lowerMessage.includes('function') || lowerMessage.includes('code') || lowerMessage.includes('example'))) {
         return `# Python Function Example
 
 Here's a useful Python function for organizing book chapters:

@@ -28,6 +28,11 @@
         "command": "Author-AI-Assistant.openBookWritingPanel",
         "title": "$(book) Open Book Writing Assistant Panel (Right Side)",
         "category": "Book Writing"
+      },
+      {
+        "command": "Author-AI-Assistant.clearConversation",
+        "title": "$(trash) Clear Chat History",
+        "category": "Book Writing"
       }
     ],
     "keybindings": [
