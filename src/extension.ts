@@ -28,7 +28,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Register command to open combined chat + main panel (no Explorer conflict)
-    const openBookWritingPanel = vscode.commands.registerCommand('Author-AI-Assistant.openBookWritingPanel', () => {
+    const openChatPanel = vscode.commands.registerCommand('Author-AI-Assistant.openChatPanel', () => {
         // Create a combined panel with both chat and main content functionality
         const panel = vscode.window.createWebviewPanel(
             'bookWritingCombined',
@@ -56,7 +56,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Register the secondary command alias
     const openChatAssistant = vscode.commands.registerCommand('Author-AI-Assistant.openChatAssistant', () => {
-        vscode.commands.executeCommand('Author-AI-Assistant.openBookWritingPanel');
+        vscode.commands.executeCommand('Author-AI-Assistant.openChatPanel');
     });
 
     // Register the main content generator command
@@ -123,7 +123,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Add all disposables to context
     context.subscriptions.push(
         createBookStructure,
-        openBookWritingPanel,
+        openChatPanel,
         openChatAssistant,
         openContentGenerator,
         insertAtCursor,

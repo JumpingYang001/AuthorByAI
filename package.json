@@ -25,7 +25,7 @@
         "category": "Book Writing"
       },
       {
-        "command": "Author-AI-Assistant.openBookWritingPanel",
+        "command": "Author-AI-Assistant.openChatPanel",
         "title": "$(book) Open Book Writing Assistant Panel (Right Side)",
         "category": "Book Writing"
       },
@@ -43,9 +43,9 @@
         "when": "!inDebugMode"
       },
       {
-        "command": "Author-AI-Assistant.openBookWritingPanel",
-        "key": "ctrl+shift+w",
-        "mac": "cmd+shift+w"
+        "command": "Author-AI-Assistant.openChatPanel",
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c"
       }
     ]
   },

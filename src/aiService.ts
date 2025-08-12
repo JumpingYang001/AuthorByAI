@@ -36,7 +36,12 @@ export class AIService {
             console.log('Claude failed:', error);
         }
 
-        // Fallback to local demonstration responses
+        // For content generation context, throw an error to trigger template fallback in the main panel
+        if (context === 'content') {
+            throw new Error('All AI services unavailable, triggering template fallback');
+        }
+
+        // For chat context, use fallback response system
         console.log('All external AI services unavailable, using fallback responses');
         const content = this._getFallbackResponse(prompt, context);
         return { content, source: 'fallback' };
@@ -216,12 +221,64 @@ Follow the exact format specifications provided in the user prompt.`;
         try {
             const { TemplateService } = require('./templateService');
             const templateService = TemplateService.getInstance();
-            return templateService.generateChatResponse(prompt);
+            
+            if (context === 'chat') {
+                return templateService.generateChatResponse(prompt);
+            } else {
+                // For content generation, try to extract content type and topic from prompt
+                return this._handleContentGenerationFallback(prompt, templateService);
+            }
         } catch (error) {
             console.log('TemplateService fallback failed:', error);
             // Ultimate fallback if TemplateService fails
             return this._getBasicFallbackResponse(prompt, context);
         }
+    }
+
+    /**
+     * Handle content generation fallback by parsing the prompt for content type and topic
+     */
+    private _handleContentGenerationFallback(prompt: string, templateService: any): string {
+        const lowerPrompt = prompt.toLowerCase();
+        
+        // Try to extract content type from prompt
+        let contentType = 'lesson_content'; // default
+        let topic = 'Sample Topic';
+        let domain = 'General';
+        
+        if (lowerPrompt.includes('chapter') && lowerPrompt.includes('outline')) {
+            contentType = 'chapter_outline';
+        } else if (lowerPrompt.includes('exercise')) {
+            contentType = 'exercise';
+        } else if (lowerPrompt.includes('quiz')) {
+            contentType = 'quiz';
+        } else if (lowerPrompt.includes('summary')) {
+            contentType = 'summary';
+        }
+        
+        // Try to extract topic (look for quoted strings or common patterns)
+        const topicMatch = prompt.match(/topic[:\s]+"([^"]+)"/i) || 
+                          prompt.match(/about\s+"([^"]+)"/i) ||
+                          prompt.match(/"([^"]+)"/);
+        if (topicMatch) {
+            topic = topicMatch[1];
+        }
+        
+        // Try to extract domain
+        const domainMatch = prompt.match(/domain[:\s]+"([^"]+)"/i) ||
+                           prompt.match(/subject[:\s]+"([^"]+)"/i);
+        if (domainMatch) {
+            domain = domainMatch[1];
+        }
+        
+        console.log(`Fallback content generation: type=${contentType}, topic=${topic}, domain=${domain}`);
+        
+        // Generate using template service
+        return templateService.generateTemplate(contentType, {
+            topic: topic,
+            domain: domain,
+            context: ''
+        });
     }
 
     /**

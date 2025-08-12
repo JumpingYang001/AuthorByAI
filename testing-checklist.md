@@ -28,10 +28,12 @@
 
 ## ✅ Interactive Features
 - [ ] Copy button works for all message types
-- [ ] Insert button adds content to active editor
+- [ ] **Insert button adds content to active editor AND returns focus to editor**
+- [ ] **Create file button creates new file AND focuses the new file**
 - [ ] **Hover actions appear on assistant messages**
 - [ ] Button states update correctly during operations
 - [ ] **Action buttons work for both template and AI responses**
+- [ ] **No focus remains in webview after insert operations**
 
 ## ✅ Fallback Content System (New)
 - [ ] **TemplateService provides responses when AI unavailable**
@@ -102,6 +104,40 @@
 - Message with mixed markdown (tables + code + headers)
 - Rapid fire of multiple messages
 - Large Python code example with complex formatting
+
+### 6. Focus Management Tests (Critical)
+- **Insert Content Focus Test**:
+  1. Open a file in editor and position cursor
+  2. Open chat assistant in separate panel/tab
+  3. Send message: "Show me a Python function"
+  4. Click "Insert" button on the response
+  5. **Verify**: Content inserted at cursor AND focus returns to editor (not webview)
+  6. **Verify**: Cursor positioned after inserted content
+  
+- **Create File Focus Test**:
+  1. Open chat assistant
+  2. Send message: "Show me a Python function"
+  3. Click "Create File" button on code block
+  4. **Verify**: New file opens with code AND focus is on new file
+  5. **Verify**: No focus remains in webview
+
+### 7. Content Generation Template Tests (Critical)
+- **Main Panel Content Generation**:
+  1. Open Content Generator (`Ctrl+Shift+B`)
+  2. Select "Chapter Outline" content type
+  3. Enter topic: "JavaScript Fundamentals" 
+  4. Enter domain: "Programming"
+  5. Click "Generate Content"
+  6. **Verify**: Generates actual chapter outline template (NOT markdown examples)
+  7. **Verify**: Content includes learning objectives, chapter structure, etc.
+  
+- **Different Content Types Test**:
+  1. Test "Lesson Content" - should generate lesson template
+  2. Test "Exercise" - should generate exercise template  
+  3. Test "Quiz" - should generate quiz template
+  4. Test "Summary" - should generate summary template
+  5. **Verify**: Each generates appropriate template structure
+  6. **Verify**: Templates contain topic-specific content
 
 ## Commands to Test:
 - **Ctrl+Shift+W** (Cmd+Shift+W on Mac) - Open Book Writing Assistant Panel
