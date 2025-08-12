@@ -7,6 +7,7 @@ import { SessionContextManager } from './sessionManager';
 import { BookStructureService } from './bookStructureService';
 import { ConversationStorage } from './conversationStorage';
 import { ContentType, ContentGenerationRequest, WebviewMessage } from './types';
+import { sanitizeInput, sanitizeFilename } from './utils';
 
 // Import webview providers
 import { BookWritingPanel } from './providers/mainPanel';
@@ -66,11 +67,14 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Register insert at cursor command for webview
     const insertAtCursor = vscode.commands.registerCommand('Author-AI-Assistant.insertAtCursor', async (text: string) => {
+        // Validate and sanitize the text before insertion
+        const sanitizedText = sanitizeInput(text);
+        
         const editor = vscode.window.activeTextEditor;
         if (editor) {
             const position = editor.selection.active;
             await editor.edit(editBuilder => {
-                editBuilder.insert(position, text);
+                editBuilder.insert(position, sanitizedText);
             });
         }
     });
@@ -79,34 +83,48 @@ export function activate(context: vscode.ExtensionContext) {
     const createFileFromCode = vscode.commands.registerCommand('Author-AI-Assistant.createFile', async (code: string, language: string) => {
         try {
             const { getFileExtension } = await import('./utils');
-            const extension = getFileExtension(language);
             
-            // Ask user for filename
+            // Validate and sanitize inputs
+            const sanitizedCode = sanitizeInput(code);
+            const sanitizedLanguage = language.replace(/[^a-zA-Z0-9]/g, ''); // Only allow alphanumeric
+            const extension = getFileExtension(sanitizedLanguage);
+            
+            // Ask user for filename with validation
             const fileName = await vscode.window.showInputBox({
-                prompt: `Enter filename for ${language} code`,
+                prompt: `Enter filename for ${sanitizedLanguage} code`,
                 value: `untitled${extension}`,
                 validateInput: (value) => {
                     if (!value || value.trim().length === 0) {
                         return 'Filename cannot be empty';
+                    }
+                    if (value.length > 100) {
+                        return 'Filename too long (max 100 characters)';
+                    }
+                    // Check for dangerous characters
+                    if (/[<>:"/\\|?*\x00-\x1f]/.test(value)) {
+                        return 'Filename contains invalid characters';
                     }
                     return null;
                 }
             });
 
             if (fileName) {
-                // Create new untitled document with the code
+                // Sanitize the filename
+                const sanitizedFileName = sanitizeFilename(fileName);
+                
+                // Create new untitled document with the sanitized code
                 const doc = await vscode.workspace.openTextDocument({
-                    content: code,
-                    language: language === 'text' ? undefined : language
+                    content: sanitizedCode,
+                    language: sanitizedLanguage === 'text' ? undefined : sanitizedLanguage
                 });
                 
                 // Show the document
                 await vscode.window.showTextDocument(doc);
                 
                 // Suggest saving with the specified filename
-                if (fileName !== 'untitled' + extension) {
+                if (sanitizedFileName !== 'untitled' + extension) {
                     vscode.window.showInformationMessage(
-                        `Code loaded. Save as "${fileName}" when ready.`,
+                        `Code loaded. Save as "${sanitizedFileName}" when ready.`,
                         'Save Now'
                     ).then(choice => {
                         if (choice === 'Save Now') {

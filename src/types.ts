@@ -55,3 +55,30 @@ export interface ContentTemplate {
     topic: string;
     domain: string;
 }
+
+// Input validation interfaces
+export interface ValidationResult {
+    isValid: boolean;
+    sanitized: string;
+    error?: string;
+}
+
+export interface RateLimitResult {
+    allowed: boolean;
+    retryAfter?: number;
+}
+
+// Security and validation types
+export interface SecurityConfig {
+    maxMessageLength: number;
+    maxFilenameLength: number;
+    maxTopicLength: number;
+    rateLimitRequests: number;
+    rateLimitWindowMs: number;
+}
+
+export interface InputValidationError {
+    field: string;
+    message: string;
+    code: 'INVALID_TYPE' | 'TOO_LONG' | 'TOO_SHORT' | 'INVALID_CHARS' | 'RATE_LIMITED' | 'DANGEROUS_CONTENT';
+}

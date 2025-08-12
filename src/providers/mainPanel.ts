@@ -5,6 +5,7 @@ import { AIService } from '../aiService';
 import { TemplateService } from '../templateService';
 import { PromptBuilder } from '../promptBuilder';
 import { ContentType } from '../types';
+import { validateContentType, validateTopicOrDomain, sanitizeFilename, RateLimiter } from '../utils';
 
 /**
  * Main Book Writing Panel Provider
@@ -73,13 +74,57 @@ export class BookWritingPanel {
 
     private async _handleContentGeneration(request: any): Promise<void> {
         try {
+            // Validate input parameters
+            const validationErrors: string[] = [];
+            
+            // Validate content type
+            if (!validateContentType(request.contentType)) {
+                validationErrors.push('Invalid content type');
+            }
+            
+            // Validate topic
+            const topicValidation = validateTopicOrDomain(request.topic || '', 'Topic');
+            if (!topicValidation.isValid) {
+                validationErrors.push(`Topic: ${topicValidation.error}`);
+            }
+            
+            // Validate domain
+            const domainValidation = validateTopicOrDomain(request.domain || '', 'Domain');
+            if (!domainValidation.isValid) {
+                validationErrors.push(`Domain: ${domainValidation.error}`);
+            }
+            
+            // Check rate limiting for content generation
+            const rateLimiter = RateLimiter.getInstance();
+            const rateCheck = rateLimiter.checkLimit('content-generation', 100, 60000); // 10 requests per minute
+            if (!rateCheck.allowed) {
+                validationErrors.push(`Rate limit exceeded. Please wait ${rateCheck.retryAfter} seconds.`);
+            }
+            
+            if (validationErrors.length > 0) {
+                this._panel.webview.postMessage({
+                    command: 'updateStatus',
+                    status: 'error',
+                    message: `❌ Validation errors: ${validationErrors.join(', ')}`
+                });
+                return;
+            }
+            
+            // Sanitize the validated inputs
+            const sanitizedRequest = {
+                ...request,
+                topic: topicValidation.sanitized,
+                domain: domainValidation.sanitized,
+                context: request.context ? validateTopicOrDomain(request.context, 'Context').sanitized : ''
+            };
+            
             // Store the current request for later use in save operations
-            this.currentRequest = request;
+            this.currentRequest = sanitizedRequest;
             
             this._panel.webview.postMessage({
                 command: 'updateStatus',
                 status: 'generating',
-                message: `🤖 Generating ${request.contentType}...`
+                message: `🤖 Generating ${sanitizedRequest.contentType}...`
             });
 
             let content: string;
@@ -88,7 +133,7 @@ export class BookWritingPanel {
             // First, try to use AI service
             try {
                 const contextSummary = this._contextManager.getContextSummary();
-                const aiPrompt = PromptBuilder.buildContentGenerationPrompt(request, contextSummary);
+                const aiPrompt = PromptBuilder.buildContentGenerationPrompt(sanitizedRequest, contextSummary);
                 
                 const aiResponse = await this._aiService.getResponse(aiPrompt, 'content');
                 content = aiResponse.content;
@@ -148,7 +193,8 @@ export class BookWritingPanel {
             // Determine the appropriate subdirectory based on content type
             const subDirectory = await this._getSubDirectoryForContentType();
             
-            const sanitizedFilename = filename.replace(/[<>:"/\\|?*]/g, '-');
+            // Use robust filename sanitization
+            const sanitizedFilename = sanitizeFilename(filename);
             const finalFilename = sanitizedFilename.endsWith('.md') ? sanitizedFilename : `${sanitizedFilename}.md`;
             
             // Create the full path with subdirectory

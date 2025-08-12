@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import { renderMarkdownContent } from './markdownRenderer';
 import { ConversationStorage } from './conversationStorage';
 import { BookWritingPanel } from './providers/mainPanel';
+import { validateUserMessage, sanitizeInput, RateLimiter } from './utils';
+import { ValidationResult, RateLimitResult } from './types';
 
 /**
  * WebView Chat Panel - Handles the combined chat interface
@@ -772,9 +774,37 @@ export class WebViewChatPanel {
      */
     private static async handleCombinedPanelChat(userMessageText: string, webview: vscode.Webview): Promise<void> {
         try {
+            // Validate and sanitize user input
+            const validation = validateUserMessage(userMessageText);
+            if (!validation.isValid) {
+                webview.postMessage({
+                    command: 'addMessage',
+                    sender: 'assistant',
+                    content: `❌ **Input Error**: ${validation.error}`,
+                    messageId: 'error-' + Date.now()
+                });
+                return;
+            }
+
+            // Check rate limiting
+            const rateLimiter = RateLimiter.getInstance();
+            const rateCheck = rateLimiter.checkLimit('chat-requests', 30, 60000); // 30 requests per minute
+            if (!rateCheck.allowed) {
+                webview.postMessage({
+                    command: 'addMessage',
+                    sender: 'assistant',
+                    content: `⏳ **Rate Limit**: Too many requests. Please wait ${rateCheck.retryAfter} seconds before sending another message.`,
+                    messageId: 'rate-limit-' + Date.now()
+                });
+                return;
+            }
+
+            // Use sanitized input
+            const sanitizedMessage = validation.sanitized;
+            
             // Save user message to conversation history
             const conversationStorage = ConversationStorage.getInstance();
-            conversationStorage.addMessage('user', userMessageText, false);
+            conversationStorage.addMessage('user', sanitizedMessage, false);
             
             // Show typing indicator
             const typingMessageId = 'typing-' + Date.now();
@@ -793,7 +823,7 @@ export class WebViewChatPanel {
             const recentMessages = conversationStorage.getConversation().slice(-6);
             const contextString = recentMessages.map(msg => `${msg.role}: ${msg.content}`).join('\n');
             
-            const responseObj = await aiService.getResponse(userMessageText, 'chat');
+            const responseObj = await aiService.getResponse(sanitizedMessage, 'chat');
             
             // Debug: Log the raw response
             console.log('Raw AI response:', responseObj.content);
