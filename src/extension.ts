@@ -12,6 +12,7 @@ import { ContentType, ContentGenerationRequest, WebviewMessage } from './types';
 // Import webview providers
 import { BookWritingChatProvider } from './providers/chatProvider';
 import { BookWritingPanel } from './providers/mainPanel';
+import { ModelConfigProvider } from './providers/configProvider';
 
 // This method is called when your extension is activated
 export function activate(context: vscode.ExtensionContext) {
@@ -21,6 +22,12 @@ export function activate(context: vscode.ExtensionContext) {
     const chatProvider = new BookWritingChatProvider(context.extensionUri);
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(BookWritingChatProvider.viewType, chatProvider)
+    );
+
+    // Register model configuration provider
+    const configProvider = new ModelConfigProvider(context.extensionUri);
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(ModelConfigProvider.viewType, configProvider)
     );
 
     // Register command to create book structure

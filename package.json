@@ -65,12 +65,47 @@
     "views": {
       "bookWriting": [
         {
-          "id": "bookWritingChat",
-          "name": "Writing Assistant Chat",
+          "id": "bookWritingConfig",
+          "name": "AI Model Configuration",
           "type": "webview",
-          "icon": "$(comment-discussion)"
+          "icon": "$(settings-gear)"
         }
       ]
+    },
+    "configuration": {
+      "title": "Book Writing Assistant",
+      "properties": {
+        "bookWritingAssistant.aiProvider": {
+          "type": "string",
+          "default": "openai",
+          "enum": ["openai", "anthropic", "google", "local"],
+          "description": "AI provider to use for content generation"
+        },
+        "bookWritingAssistant.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key for the selected AI provider"
+        },
+        "bookWritingAssistant.model": {
+          "type": "string",
+          "default": "gpt-3.5-turbo",
+          "description": "Model name to use for content generation"
+        },
+        "bookWritingAssistant.temperature": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "description": "Controls randomness in AI responses (0.0 = deterministic, 2.0 = very creative)"
+        },
+        "bookWritingAssistant.maxTokens": {
+          "type": "integer",
+          "default": 2000,
+          "minimum": 100,
+          "maximum": 8000,
+          "description": "Maximum number of tokens in generated content"
+        }
+      }
     }
   },
   "scripts": {

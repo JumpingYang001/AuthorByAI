@@ -45,7 +45,7 @@ export interface WebviewMessage {
 
 export interface AIServiceResponse {
     content: string;
-    source: 'openai' | 'local' | 'claude' | 'template';
+    source: 'openai' | 'local' | 'claude' | 'gemini' | 'template';
 }
 
 export type ContentType = 'chapter_outline' | 'lesson_content' | 'exercise' | 'quiz' | 'summary';
