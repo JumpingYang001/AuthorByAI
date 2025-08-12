@@ -56,6 +56,28 @@ export function activate(context: vscode.ExtensionContext) {
                     // Open the main content generator panel
                     BookWritingPanel.createOrShow(context.extensionUri);
                     break;
+                case 'clearConversation':
+                    // Clear conversation history with VS Code confirmation dialog
+                    const conversationStorage = ConversationStorage.getInstance();
+                    const stats = conversationStorage.getStats();
+                    
+                    if (stats.totalMessages === 0) {
+                        vscode.window.showInformationMessage('💬 No conversation history to clear');
+                    } else {
+                        const choice = await vscode.window.showWarningMessage(
+                            `Clear conversation history? This will delete ${stats.totalMessages} messages permanently.`,
+                            { modal: true },
+                            'Clear History'
+                        );
+                        
+                        if (choice === 'Clear History') {
+                            conversationStorage.clearConversation();
+                            // Refresh the webview to show empty chat
+                            panel.webview.html = getCombinedHtml();
+                            vscode.window.showInformationMessage('✅ Conversation history cleared');
+                        }
+                    }
+                    break;
                 case 'insertText':
                     // Insert text at cursor position in active editor
                     console.log('Received insertText command with text:', data.text);
@@ -360,6 +382,11 @@ function getCombinedHtml(): string {
             display: flex;
             justify-content: space-between;
             align-items: center;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 8px;
         }
 
         .open-generator-btn {
@@ -687,6 +714,15 @@ function getCombinedHtml(): string {
                 font-size: 10px;
                 padding: 6px 12px;
             }
+            
+            .header-buttons {
+                gap: 4px;
+            }
+            
+            .header-buttons .open-generator-btn {
+                padding: 6px 8px;
+                font-size: 9px;
+            }
         }
     </style>
 </head>
@@ -696,7 +732,10 @@ function getCombinedHtml(): string {
         <div class="panel">
             <div class="panel-header">
                 <span>💬 Writing Chat Assistant</span>
-                <button class="open-generator-btn" id="openGeneratorButton">📝 Open Generator</button>
+                <div class="header-buttons">
+                    <button class="open-generator-btn" id="clearConversationButton">🗑️ Clear Chat</button>
+                    <button class="open-generator-btn" id="openGeneratorButton">📝 Open Generator</button>
+                </div>
             </div>
             <div class="panel-content">
                 <div class="chat-container">
@@ -732,6 +771,9 @@ function getCombinedHtml(): string {
                     case 'enableSendButton':
                         enableSendButton();
                         break;
+                    case 'showNotification':
+                        showNotification(message.message);
+                        break;
                 }
             });
 
@@ -761,6 +803,13 @@ function getCombinedHtml(): string {
             function openContentGenerator() {
                 vscode.postMessage({
                     command: 'openContentGenerator'
+                });
+            }
+
+            function clearConversation() {
+                // Send clear request - confirmation will be handled by extension
+                vscode.postMessage({
+                    command: 'clearConversation'
                 });
             }
 
@@ -1096,6 +1145,12 @@ function getCombinedHtml(): string {
                 const openGenButton = document.getElementById('openGeneratorButton');
                 if (openGenButton) {
                     openGenButton.addEventListener('click', openContentGenerator);
+                }
+
+                // Clear conversation button click
+                const clearButton = document.getElementById('clearConversationButton');
+                if (clearButton) {
+                    clearButton.addEventListener('click', clearConversation);
                 }
 
                 // Enter key for chat input
