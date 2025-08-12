@@ -36,7 +36,10 @@ export class AIService {
             console.log('Claude failed:', error);
         }
 
-        throw new Error('All AI services unavailable');
+        // Fallback to local demonstration responses
+        console.log('All external AI services unavailable, using fallback responses');
+        const content = this._getFallbackResponse(prompt, context);
+        return { content, source: 'fallback' };
     }
 
     private async _callOpenAI(prompt: string, context: 'chat' | 'content'): Promise<string> {
@@ -203,5 +206,162 @@ CONTENT STANDARDS:
 - Maintain professional tone while being accessible
 
 Follow the exact format specifications provided in the user prompt.`;
+    }
+
+    /**
+     * Fallback response system when no external AI services are available
+     */
+    private _getFallbackResponse(prompt: string, context: 'chat' | 'content'): string {
+        // Use TemplateService for comprehensive fallback responses
+        try {
+            const { TemplateService } = require('./templateService');
+            const templateService = TemplateService.getInstance();
+            return templateService.generateChatResponse(prompt);
+        } catch (error) {
+            console.log('TemplateService fallback failed:', error);
+            // Ultimate fallback if TemplateService fails
+            return this._getBasicFallbackResponse(prompt, context);
+        }
+    }
+
+    /**
+     * Basic fallback response as last resort
+     */
+    private _getBasicFallbackResponse(prompt: string, context: 'chat' | 'content'): string {
+        const lowerPrompt = prompt.toLowerCase();
+        
+        // Code examples
+        if (lowerPrompt.includes('python') && lowerPrompt.includes('function')) {
+            return `# Python Function Example
+
+Here's a simple Python function that demonstrates common programming concepts:
+
+\`\`\`python
+def calculate_fibonacci(n):
+    """
+    Calculate the nth Fibonacci number using iteration.
+    
+    Args:
+        n (int): The position in the Fibonacci sequence
+        
+    Returns:
+        int: The nth Fibonacci number
+    """
+    if n <= 0:
+        return 0
+    elif n == 1:
+        return 1
+    
+    a, b = 0, 1
+    for i in range(2, n + 1):
+        a, b = b, a + b
+    
+    return b
+
+# Example usage
+if __name__ == "__main__":
+    # Test the function
+    for i in range(10):
+        print(f"Fibonacci({i}) = {calculate_fibonacci(i)}")
+    
+    # Calculate a larger Fibonacci number
+    result = calculate_fibonacci(20)
+    print(f"The 20th Fibonacci number is: {result}")
+\`\`\`
+
+## Key Features Demonstrated:
+
+- **Docstring**: Clear documentation with Args and Returns
+- **Edge Cases**: Handling n <= 0 and n == 1
+- **Iteration**: Using a for loop instead of recursion for efficiency
+- **Multiple Assignment**: Using \`a, b = b, a + b\` for clean swapping
+- **Main Guard**: Using \`if __name__ == "__main__":\` for testing
+- **Examples**: Showing both loop usage and single calculation
+
+This function is efficient with O(n) time complexity and O(1) space complexity.`;
+        }
+        
+        // Writing assistance
+        if (lowerPrompt.includes('write') || lowerPrompt.includes('book') || lowerPrompt.includes('chapter')) {
+            return `# Writing Assistant Response
+
+I'm here to help with your writing projects! Here are some ways I can assist:
+
+## **Content Creation**
+- **Chapter outlines** with clear structure and flow
+- **Character development** templates and exercises  
+- **Plot structure** guidance using proven frameworks
+- **Dialog writing** techniques and examples
+
+## **Writing Process**
+- **Research organization** methods
+- **Daily writing goals** and tracking
+- **Revision strategies** for different draft stages
+- **Publishing pathways** for different genres
+
+## **Tools & Techniques**
+- **Markdown formatting** for structured documents
+- **Version control** for manuscript management
+- **Collaboration** workflows for co-authors
+- **Export options** to various publishing formats
+
+**What specific aspect of writing would you like help with?** I can provide detailed guidance on any of these topics.
+
+*Note: AI services are currently offline, but I can still provide helpful writing guidance and code examples.*`;
+        }
+        
+        // General programming
+        if (lowerPrompt.includes('code') || lowerPrompt.includes('program') || lowerPrompt.includes('function')) {
+            return `# Programming Assistance
+
+I can help you with various programming topics! Here are some areas I cover:
+
+## **Languages & Frameworks**
+- **Python**: Data structures, functions, classes, libraries
+- **JavaScript/TypeScript**: Modern ES6+, Node.js, frameworks
+- **VS Code Extensions**: Development, debugging, publishing
+- **Web Development**: HTML, CSS, React, APIs
+
+## **Best Practices**
+- **Clean Code**: Naming, structure, documentation
+- **Testing**: Unit tests, integration tests, TDD
+- **Version Control**: Git workflows, collaboration
+- **Performance**: Optimization techniques, profiling
+
+## **Example Code Templates**
+- Functions with proper documentation
+- Class structures with inheritance
+- API integration examples
+- File processing utilities
+
+**What programming topic or language would you like help with?** I can provide specific examples and explanations.
+
+*Note: External AI services are currently unavailable, but I can still provide code examples and programming guidance.*`;
+        }
+        
+        // Fallback for any other queries
+        return `# Book Writing Assistant
+
+Hello! I'm your VS Code Book Writing Assistant. While my AI services are currently offline, I can still help you with:
+
+## **Available Features**
+- **Content Templates**: Pre-built structures for chapters, lessons, exercises
+- **Markdown Examples**: Properly formatted educational content
+- **Code Examples**: Programming tutorials and documentation
+- **Writing Guidance**: Best practices for technical and educational writing
+
+## **Quick Examples**
+Want to see a **Python function**? Just ask!
+Need help with **markdown formatting**? I've got templates!
+Looking for **writing structure** ideas? I can provide outlines!
+
+## **How to Get Started**
+1. Ask for specific code examples (e.g., "Show me a Python class")
+2. Request writing templates (e.g., "Create a chapter outline")
+3. Get formatting help (e.g., "How do I make tables in markdown?")
+
+**What would you like help with today?**
+
+*Note: This is a demonstration mode. For full AI capabilities, configure API keys in the extension settings.*`;
     }
 }

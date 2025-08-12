@@ -2,45 +2,101 @@
 
 ## Overview
 
-The Book Writing Assistant is a VS Code extension designed to help authors create structured educational content and training materials. The system uses a modular architecture with AI integration, template fallbacks, and context-aware content generation.
+The Book Writing Assistant is a VS Code extension designed to help authors create structured educational content and training materials. The system uses a modular architecture with AI integration, template fallbacks, context-aware content generation, and comprehensive markdown rendering capabilities.
+
+## ✨ Key Features
+
+- **📝 Smart Writing Assistant**: AI-powered suggestions for plot development, character creation, and content structure
+- **🎨 Rich Markdown Rendering**: Full support for code blocks, tables, headers, lists with syntax highlighting
+- **🔄 Fallback Content**: Comprehensive built-in templates when AI services are unavailable
+- **📋 Interactive Features**: Copy, insert, and create files directly from chat responses
+- **🔧 Modular Architecture**: Clean separation of concerns for maintainability
+- **💾 Conversation Persistence**: Messages and history preserved across sessions
 
 ## System Architecture
 
-### Core Components
+### Core Components (Refactored)
 
 ```
 src/
 ├── extension.ts              # Main extension entry point and command registration
+├── webviewChatPanel.ts       # Chat panel UI logic & message handling  
+├── markdownRenderer.ts       # Shared markdown rendering with syntax highlighting
 ├── types.ts                  # TypeScript type definitions and interfaces
 ├── sessionManager.ts         # Session context and state management
-├── aiService.ts             # AI integration (OpenAI, Claude, Local AI)
-├── templateService.ts       # Template generation for fallback content
+├── aiService.ts             # AI integration (OpenAI, Claude, Local AI) with fallback
+├── templateService.ts       # Template generation & comprehensive fallback content
 ├── promptBuilder.ts         # Shared prompt utilities for AI content generation
 ├── bookStructureService.ts  # Book project structure creation and management
+├── conversationStorage.ts   # Message persistence & history management
 └── providers/               # Webview providers for UI components
-    ├── chatProvider.ts      # Sidebar chat interface
     └── mainPanel.ts         # Main content editing panel
 ```
 
 ## File-by-File Analysis
 
-### 1. `extension.ts` - Extension Entry Point
+### 1. `extension.ts` - Extension Entry Point (Refactored)
 
-**Purpose**: Main activation point, command registration, and provider initialization.
+**Purpose**: Main activation point, command registration, and orchestration.
 
 **Key Functions**:
 - `activate(context)`: Extension activation and service registration
-- `deactivate()`: Clean up on extension deactivation
+- Command registration for chat panel and book structure
+- Provider initialization and dependency injection
 
 **Architecture Role**:
-- Registers all webview providers
-- Sets up command handlers
+- Lightweight orchestration layer
+- Delegates to specialized modules
 - Manages extension lifecycle
 
-**Data Flow**:
-```
-VS Code → extension.ts → Providers Registration → UI Components Ready
-```
+**Refactoring Impact**:
+- Reduced from large monolithic file to focused entry point
+- Chat logic moved to `webviewChatPanel.ts`
+- Markdown rendering extracted to `markdownRenderer.ts`
+
+### 2. `webviewChatPanel.ts` - Chat Panel Logic (New)
+
+**Purpose**: Handles all chat panel UI logic and message handling.
+
+**Key Functions**:
+- `handleCombinedPanelChat()`: Main chat processing logic
+- `replaceChatMessage()`: Message rendering and replacement
+- `renderMarkdownContent()`: Integrates shared markdown renderer
+
+**Architecture Role**:
+- Manages webview lifecycle and state
+- Handles user interactions and AI responses
+- Integrates with AIService and TemplateService
+
+### 3. `markdownRenderer.ts` - Shared Rendering Logic (New)
+
+**Purpose**: Centralized markdown rendering with syntax highlighting and code block support.
+
+**Key Functions**:
+- `renderMarkdownContent()`: Main rendering function with placeholder handling
+- Code block processing with syntax highlighting
+- Table, header, and list rendering support
+
+**Features**:
+- Python syntax highlighting for code blocks
+- Placeholder system to prevent double-processing
+- Support for tables, headers, bold, italic, lists
+- Action buttons for code blocks (copy, insert, create file)
+
+### 4. `templateService.ts` - Enhanced Fallback Content
+
+**Purpose**: Comprehensive template generation and fallback content.
+
+**Key Functions**:
+- `generateChatResponse()`: Smart template selection based on user input
+- `_getMarkdownFormattingExamples()`: Complete markdown examples including tables
+- `_getPythonFunctionExamples()`: Code examples with proper syntax
+
+**Enhanced Features**:
+- Markdown table examples
+- Python function templates
+- Comprehensive formatting demonstrations
+- Context-aware template selection
 
 ### 2. `types.ts` - Type Definitions
 
@@ -544,6 +600,50 @@ LOCAL_AI_URL=http://localhost:11434  # For Ollama
 - No sensitive data in error messages
 - Graceful handling of API failures
 - User-friendly error reporting
+
+## Recent Architecture Improvements
+
+### Major Refactoring (Latest)
+
+The extension has undergone significant architectural improvements to enhance maintainability, performance, and user experience:
+
+#### 1. **Modular File Structure**
+- **Before**: Large monolithic `extension.ts` file (1000+ lines)
+- **After**: Clean separation into focused modules:
+  - `webviewChatPanel.ts`: Chat UI and interaction logic
+  - `markdownRenderer.ts`: Shared rendering with syntax highlighting
+  - `templateService.ts`: Enhanced fallback content system
+
+#### 2. **Shared Markdown Rendering**
+- **Unified Logic**: Single `markdownRenderer.ts` handles all markdown processing
+- **Advanced Features**: Python syntax highlighting, table support, code block actions
+- **Placeholder System**: Prevents double-processing of markdown content
+- **Performance**: Consistent rendering across all UI components
+
+#### 3. **Enhanced Template System**
+- **Comprehensive Examples**: Python functions, markdown tables, formatting guides
+- **Context-Aware**: Smart template selection based on user input
+- **Rich Content**: Full markdown feature demonstrations
+- **Fallback Integration**: Seamless fallback when AI services unavailable
+
+#### 4. **Improved Code Block Handling**
+- **Syntax Highlighting**: Python code blocks with proper color coding
+- **Action Buttons**: Copy, Insert to Editor, Create File functionality
+- **Multi-line Support**: Complex code examples maintain formatting
+- **Placeholder Prevention**: Eliminates double-processing artifacts
+
+#### 5. **Benefits Achieved**
+- **Maintainability**: Easier to modify and extend individual components
+- **Testing**: Isolated modules for better unit test coverage
+- **Performance**: Optimized rendering and reduced redundancy
+- **Developer Experience**: Clear separation of concerns
+- **User Experience**: Consistent behavior across all markdown content
+
+### Technical Debt Reduction
+- **Eliminated**: Duplicated markdown processing logic
+- **Reduced**: Code complexity through modularization  
+- **Improved**: Error handling and fallback mechanisms
+- **Enhanced**: Type safety and interface consistency
 
 ## Future Enhancement Areas
 
