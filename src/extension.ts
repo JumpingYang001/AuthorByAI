@@ -7,7 +7,7 @@ import { SessionContextManager } from './sessionManager';
 import { BookStructureService } from './bookStructureService';
 import { ConversationStorage } from './conversationStorage';
 import { ContentType, ContentGenerationRequest, WebviewMessage } from './types';
-import { sanitizeInput, sanitizeFilename } from './utils';
+import { sanitizeInput, sanitizeFilename, getFileExtension } from './utils';
 
 // Import webview providers
 import { BookWritingPanel } from './providers/mainPanel';
@@ -67,14 +67,74 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Register insert at cursor command for webview
     const insertAtCursor = vscode.commands.registerCommand('Author-AI-Assistant.insertAtCursor', async (text: string) => {
-        // Validate and sanitize the text before insertion
-        const sanitizedText = sanitizeInput(text);
+        console.log('insertAtCursor command received text:', text?.substring(0, 100) + '...');
         
-        const editor = vscode.window.activeTextEditor;
+        // For insert at cursor, we want to preserve the original markdown content
+        // Only do basic safety checks without HTML escaping
+        if (!text || typeof text !== 'string') {
+            console.log('Invalid text provided');
+            vscode.window.showErrorMessage('Invalid content provided for insertion');
+            return;
+        }
+        
+        console.log('Using original text without HTML escaping for insertion');
+        
+        let editor = vscode.window.activeTextEditor;
+        
+        // If no active editor, try to find any visible editor
+        if (!editor) {
+            const visibleEditors = vscode.window.visibleTextEditors;
+            if (visibleEditors.length > 0) {
+                editor = visibleEditors[0];
+                // Focus the editor first
+                await vscode.window.showTextDocument(editor.document, {
+                    viewColumn: editor.viewColumn,
+                    preserveFocus: false
+                });
+                console.log('Focused on available editor:', editor.document.fileName);
+            }
+        }
+        
+        // If still no editor, prompt user to open a file
+        if (!editor) {
+            console.log('No editors available');
+            const choice = await vscode.window.showInformationMessage(
+                'No active editor found. Would you like to create a new file to insert the content?',
+                'Create New File',
+                'Cancel'
+            );
+            
+            if (choice === 'Create New File') {
+                // Create a new untitled document
+                const newDoc = await vscode.workspace.openTextDocument({
+                    content: '',
+                    language: 'markdown' // Default to markdown for writing content
+                });
+                editor = await vscode.window.showTextDocument(newDoc);
+                console.log('Created new document for content insertion');
+            } else {
+                return; // User cancelled
+            }
+        }
+        
         if (editor) {
+            console.log('Active editor found, inserting text at position:', editor.selection.active);
             const position = editor.selection.active;
             await editor.edit(editBuilder => {
-                editBuilder.insert(position, sanitizedText);
+                editBuilder.insert(position, text); // Insert original text without sanitization
+            });
+            console.log('Text insertion completed');
+            
+            // Ensure the editor stays focused after insertion
+            await vscode.window.showTextDocument(editor.document, {
+                viewColumn: editor.viewColumn,
+                preserveFocus: false,
+                selection: new vscode.Selection(
+                    position.line, 
+                    position.character + text.length,
+                    position.line, 
+                    position.character + text.length
+                )
             });
         }
     });
@@ -82,8 +142,6 @@ export function activate(context: vscode.ExtensionContext) {
     // Register create file command for webview
     const createFileFromCode = vscode.commands.registerCommand('Author-AI-Assistant.createFile', async (code: string, language: string) => {
         try {
-            const { getFileExtension } = await import('./utils');
-            
             // Validate and sanitize inputs
             const sanitizedCode = sanitizeInput(code);
             const sanitizedLanguage = language.replace(/[^a-zA-Z0-9]/g, ''); // Only allow alphanumeric

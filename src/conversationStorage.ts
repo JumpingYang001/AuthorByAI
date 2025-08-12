@@ -58,6 +58,13 @@ export class ConversationStorage {
     }
 
     /**
+     * Get a specific message by ID
+     */
+    public getMessageById(messageId: string): ChatMessage | undefined {
+        return this.currentConversation.find(msg => msg.id === messageId);
+    }
+
+    /**
      * Clear the current conversation
      */
     public clearConversation(): void {

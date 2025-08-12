@@ -40,6 +40,8 @@ export interface ContentRequest extends ContentGenerationRequest {
 
 export interface WebviewMessage {
     command: string;
+    text?: string;
+    messageId?: string;
     [key: string]: any;
 }
 

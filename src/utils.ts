@@ -41,6 +41,19 @@ export function escapeHtml(unsafe: string): string {
 }
 
 /**
+ * Unescape HTML entities back to normal characters
+ */
+export function unescapeHtml(safe: string): string {
+    return safe
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'")
+        .replace(/&#39;/g, "'");
+}
+
+/**
  * Comprehensive input sanitization for user inputs
  */
 export function sanitizeInput(input: string): string {

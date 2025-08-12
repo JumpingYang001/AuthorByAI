@@ -4,6 +4,7 @@ import { ConversationStorage } from './conversationStorage';
 import { BookWritingPanel } from './providers/mainPanel';
 import { validateUserMessage, sanitizeInput, RateLimiter } from './utils';
 import { ValidationResult, RateLimitResult } from './types';
+import { AIService } from './aiService';
 
 /**
  * WebView Chat Panel - Handles the combined chat interface
@@ -34,21 +35,42 @@ export class WebViewChatPanel {
             case 'insertAtCursor':
                 // Handle insert at cursor from webview
                 try {
-                    await vscode.commands.executeCommand('Author-AI-Assistant.insertAtCursor', data.text);
+                    console.log('insertAtCursor received:', data);
+                    let textToInsert = data.text;
                     
-                    // After insertion, ensure focus returns to the editor
-                    const editor = vscode.window.activeTextEditor;
-                    if (editor) {
-                        // Focus the editor document and position cursor
-                        await vscode.window.showTextDocument(editor.document, {
-                            viewColumn: editor.viewColumn,
-                            preserveFocus: false,
-                            selection: editor.selection
-                        });
+                    // If messageId is provided, get original markdown content from storage
+                    if (data.messageId && !data.text) {
+                        console.log('Looking up message by ID:', data.messageId);
+                        const conversationStorage = ConversationStorage.getInstance();
+                        const message = conversationStorage.getMessageById(data.messageId);
+                        console.log('Found message:', message);
+                        if (message && message.content) {
+                            textToInsert = message.content; // Use original markdown content (not sanitized)
+                            console.log('Using original content:', textToInsert.substring(0, 100) + '...');
+                        }
+                    }
+                    
+                    if (textToInsert) {
+                        console.log('Executing insertAtCursor command with text:', textToInsert.substring(0, 100) + '...');
+                        
+                        // Show temporary status message
+                        vscode.window.showInformationMessage('Inserting content...');
+                        
+                        // Don't sanitize the content for insertion - pass raw content
+                        await vscode.commands.executeCommand('Author-AI-Assistant.insertAtCursor', textToInsert);
+                        
+                        console.log('Insert operation completed successfully');
+                        
+                        // Show success message
+                        vscode.window.showInformationMessage('✅ Content inserted successfully!');
+                    } else {
+                        console.log('No content found to insert');
+                        vscode.window.showErrorMessage('No content found to insert');
                     }
                 } catch (error) {
                     console.error('Error inserting content:', error);
-                    vscode.window.showErrorMessage('Failed to insert content at cursor position');
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+                    vscode.window.showErrorMessage('Failed to insert content: ' + errorMessage);
                 }
                 break;
             case 'createFile':
@@ -388,7 +410,8 @@ export class WebViewChatPanel {
                         break;
                     case 'replaceMessage':
                         const isHtml = message.isHtml || message.isMarkdown; // Support both flags
-                        replaceChatMessage(message.messageId, message.content, isHtml);
+                        const actualId = message.actualMessageId || message.messageId;
+                        replaceChatMessage(message.messageId, message.content, isHtml, actualId);
                         break;
                     case 'renderMarkdownResponse':
                         handleMarkdownResponse(message.requestId, message.renderedHtml);
@@ -456,19 +479,12 @@ export class WebViewChatPanel {
             }
 
             function insertAtCursor(messageId) {
-                const messageElement = document.querySelector('.message[data-message-id="' + messageId + '"] .message-text');
-                if (messageElement) {
-                    let text = messageElement.textContent || messageElement.innerText;
-                    
-                    // Clean up the text
-                    text = text.replace(/\\n\\s*\\n/g, '\\n\\n').trim();
-                    
-                    vscode.postMessage({
-                        command: 'insertAtCursor',
-                        text: text
-                    });
-                    showNotification('Content inserted at cursor position');
-                }
+                // Request original markdown content from extension instead of extracting DOM text
+                vscode.postMessage({
+                    command: 'insertAtCursor',
+                    messageId: messageId
+                });
+                showNotification('Content inserted at cursor position');
             }
 
             function copyCode(codeId) {
@@ -653,7 +669,7 @@ export class WebViewChatPanel {
                 return container;
             }
 
-            function replaceChatMessage(messageId, content, isHtml = false) {
+            function replaceChatMessage(messageId, content, isHtml = false, actualMessageId = null) {
                 // Find the specific message by ID
                 let targetMessage = null;
                 if (messageId) {
@@ -669,20 +685,21 @@ export class WebViewChatPanel {
                 }
                 
                 if (targetMessage) {
-                    const currentMessageId = targetMessage.getAttribute('data-message-id') || ('msg-' + Date.now());
-                    targetMessage.setAttribute('data-message-id', currentMessageId);
+                    // Use the actual message ID from storage if provided, otherwise keep current
+                    const finalMessageId = actualMessageId || targetMessage.getAttribute('data-message-id') || ('msg-' + Date.now());
+                    targetMessage.setAttribute('data-message-id', finalMessageId);
                     
                     if (isHtml) {
                         // Content is already processed HTML (from markdown rendering)
                         targetMessage.innerHTML = '';
-                        const newStructure = createMessageStructure(content, currentMessageId, true);
+                        const newStructure = createMessageStructure(content, finalMessageId, true);
                         while (newStructure.firstChild) {
                             targetMessage.appendChild(newStructure.firstChild);
                         }
                     } else {
                         // Handle text content securely
                         targetMessage.innerHTML = '';
-                        const newStructure = createMessageStructure(content, currentMessageId, false);
+                        const newStructure = createMessageStructure(content, finalMessageId, false);
                         while (newStructure.firstChild) {
                             targetMessage.appendChild(newStructure.firstChild);
                         }
@@ -816,7 +833,6 @@ export class WebViewChatPanel {
             });
 
             // Get AI response
-            const { AIService } = await import('./aiService');
             const aiService = AIService.getInstance();
             
             // Get conversation context for better responses
@@ -835,14 +851,15 @@ export class WebViewChatPanel {
             console.log('Processed content:', processedContent);
             
             // Save assistant response (save the original markdown for storage)
-            conversationStorage.addMessage('assistant', responseObj.content, true);
+            const assistantMessage = conversationStorage.addMessage('assistant', responseObj.content, true);
             
-            // Replace typing message with processed HTML content
+            // Replace typing message with processed HTML content, using the actual message ID from storage
             webview.postMessage({
                 command: 'replaceMessage',
                 messageId: typingMessageId,
                 content: processedContent,
-                isHtml: true  // Flag as pre-processed HTML content
+                isHtml: true,  // Flag as pre-processed HTML content
+                actualMessageId: assistantMessage.id // Include the actual storage ID for future reference
             });
             
         } catch (error) {
