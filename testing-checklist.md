@@ -2,7 +2,7 @@
 
 ## ✅ Basic Functionality
 - [ ] Extension loads without errors
-- [ ] Chat panel opens correctly via `Ctrl+Shift+W` (Cmd+Shift+W on Mac)
+- [ ] Chat panel opens correctly via `Ctrl+Shift+C` (Cmd+Shift+C on Mac)
 - [ ] Messages send successfully through webview
 - [ ] Send button disables/enables properly during processing
 
@@ -140,7 +140,7 @@
   6. **Verify**: Templates contain topic-specific content
 
 ## Commands to Test:
-- **Ctrl+Shift+W** (Cmd+Shift+W on Mac) - Open Book Writing Assistant Panel
+- **Ctrl+Shift+C** (Cmd+Shift+C on Mac) - Open Book Writing Assistant Panel
 - **Ctrl+Shift+B** (Cmd+Shift+B on Mac) - Create Book Structure
 - **Command Palette** → "Clear Chat History" - Clear conversation history
 
