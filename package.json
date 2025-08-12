@@ -25,11 +25,6 @@
         "category": "Book Writing"
       },
       {
-        "command": "Author-AI-Assistant.openChatSidebar",
-        "title": "$(comment-discussion) Book Writing Sidebar Chat",
-        "category": "Book Writing"
-      },
-      {
         "command": "Author-AI-Assistant.openBookWritingPanel",
         "title": "$(book) Open Book Writing Assistant Panel (Right Side)",
         "category": "Book Writing"
@@ -43,35 +38,11 @@
         "when": "!inDebugMode"
       },
       {
-        "command": "Author-AI-Assistant.openChatSidebar",
-        "key": "ctrl+shift+a",
-        "mac": "cmd+shift+a"
-      },
-      {
         "command": "Author-AI-Assistant.openBookWritingPanel",
         "key": "ctrl+shift+w",
         "mac": "cmd+shift+w"
       }
-    ],
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "bookWriting",
-          "title": "Book Writing Assistant",
-          "icon": "$(book)"
-        }
-      ]
-    },
-    "views": {
-      "bookWriting": [
-        {
-          "id": "bookWritingChat",
-          "name": "Writing Assistant Chat",
-          "type": "webview",
-          "icon": "$(comment-discussion)"
-        }
-      ]
-    }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
