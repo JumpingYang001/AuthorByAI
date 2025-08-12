@@ -299,36 +299,6 @@ class BookStructureService {
 - **README.md**: Project overview and usage instructions
 - **book-outline.md**: Comprehensive book structure template
 
-### 8. `providers/chatProvider.ts` - Sidebar Chat Interface
-
-**Purpose**: Interactive chat interface for book writing assistance and content modification.
-
-**Key Features**:
-- **Content Modification Detection**: Recognizes when users want to modify existing content
-- **Context-aware Responses**: Uses session history for relevant suggestions
-- **AI Integration**: Connects to AI service for intelligent responses
-- **Smart Fallbacks**: Provides helpful guidance when AI unavailable
-
-**Architecture Pattern**: Webview Provider + Observer Pattern
-
-```typescript
-class BookWritingChatProvider implements vscode.WebviewViewProvider {
-    public resolveWebviewView()
-    private async _handleChatMessage(userMessage: string)
-    private _isContentModificationRequest(userMessage: string): boolean
-    private async _handleContentModification(userMessage: string)
-    private _getBookWritingResponse(userMessage: string)
-    private _getBookWritingFallback(userMessage: string)
-}
-```
-
-**Message Flow**:
-```
-User Input → Chat Provider → Detect Intent → 
-├── Modification Request → AI Service → Modified Content
-└── General Chat → AI Service → Helpful Response
-```
-
 ### 8. `providers/mainPanel.ts` - Main Content Panel
 
 **Purpose**: Primary content editing and display interface.
@@ -361,9 +331,8 @@ class BookWritingPanel {
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ Content         │    │ Prompt Builder  │    │ AI Service      │
-│ Generator       │───►│ (Shared Logic)  │───►│                 │
-│ (Sidebar)       │    │                 │    │                 │
+│ Main Panel      │    │ Prompt Builder  │    │ AI Service      │
+│ (User Input)    │───►│ (Shared Logic)  │───►│ (Multi-Provider)│
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          │              ┌─────────────────┐              │
@@ -372,9 +341,14 @@ class BookWritingPanel {
                         └─────────────────┘              │
                                 │                       │
                        ┌─────────────────┐    ┌─────────────────┐
-                       │ Main Panel      │◄───│ Generated       │
-                       │ Display         │    │ Content         │
+                       │ Template Service│◄───│ Generated       │
+                       │ (Fallback)      │    │ Content         │
                        └─────────────────┘    └─────────────────┘
+                                │                       │
+                       ┌─────────────────┐              │
+                       │ Main Panel      │◄─────────────┘
+                       │ Display         │
+                       └─────────────────┘
 ```
 
 ### 2. AI Integration Flow
@@ -401,21 +375,21 @@ class BookWritingPanel {
                        └─────────────────┘
 ```
 
-### 3. Chat Modification Flow
+### 3. Chat Interaction Flow
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ Chat Provider   │    │ Modification    │    │ AI Service      │
-│ (User Input)    │───►│ Detection       │───►│ (Content Edit)  │
+│ Webview Chat    │    │ Message         │    │ AI Service      │
+│ Panel (User)    │───►│ Processing      │───►│ (Content Gen)   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          │              ┌─────────────────┐              │
          └─────────────►│ Session Context │◄─────────────┘
-                        │ (Recent Content)│
+                        │ (Conversation)  │
                         └─────────────────┘
                                 │
                        ┌─────────────────┐
-                       │ Modified Content│
+                       │ Rendered        │
                        │ Response        │
                        └─────────────────┘
 ```
@@ -425,7 +399,7 @@ class BookWritingPanel {
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │ Content         │    │ Prompt Builder  │    │ AI Service      │
-│ Provider        │───►│ (Centralized)   │───►│ (Any Provider)  │
+│ Generator       │───►│ (Centralized)   │───►│ (Any Provider)  │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
 ┌─────────────────┐              │              ┌─────────────────┐
@@ -434,17 +408,17 @@ class BookWritingPanel {
 └─────────────────┘                             └─────────────────┘
          │                                               │
 ┌─────────────────┐                                      │
-│ Chat Provider   │──────────────────────────────────────┘
-│ (Same Logic)    │          Consistent Quality
+│ Webview Chat    │──────────────────────────────────────┘
+│ Panel           │          Consistent Quality
 └─────────────────┘
 ```
 
-### 4. Cross-Panel Communication
+### 5. Cross-Panel Communication
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ Content         │    │ Main Panel      │    │ Chat Provider   │
-│ Generator       │───►│ Opens & Shows   │◄───│ (Modifications) │
+│ Content         │    │ Main Panel      │    │ Webview Chat    │
+│ Generator       │───►│ Opens & Shows   │◄───│ Panel (Insert)  │
 │ (Generate)      │    │ Content         │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
@@ -551,18 +525,36 @@ LOCAL_AI_URL=http://localhost:11434  # For Ollama
 {
   "activationEvents": [],
   "contributes": {
-    "commands": [...],
-    "viewsContainers": {
-      "activitybar": [{
-        "id": "bookWriting",
-        "title": "Book Writing Assistant"
-      }]
-    },
-    "views": {
-      "bookWriting": [
-        {"id": "bookWritingChat", "name": "Writing Assistant Chat"}
-      ]
-    }
+    "commands": [
+      {
+        "command": "Author-AI-Assistant.createBookStructure",
+        "title": "Create Book Structure",
+        "category": "Book Writing"
+      },
+      {
+        "command": "Author-AI-Assistant.openChatPanel",
+        "title": "$(book) Open Book Writing Assistant Panel (Right Side)",
+        "category": "Book Writing"
+      },
+      {
+        "command": "Author-AI-Assistant.clearConversation",
+        "title": "$(trash) Clear Chat History",
+        "category": "Book Writing"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "Author-AI-Assistant.createBookStructure",
+        "key": "ctrl+shift+b",
+        "mac": "cmd+shift+b",
+        "when": "!inDebugMode"
+      },
+      {
+        "command": "Author-AI-Assistant.openChatPanel",
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c"
+      }
+    ]
   }
 }
 ```
