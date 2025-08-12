@@ -385,7 +385,8 @@ export class WebViewChatPanel {
                         addChatMessage(message.sender, message.content, message.messageId);
                         break;
                     case 'replaceMessage':
-                        replaceChatMessage(message.messageId, message.content, message.isMarkdown);
+                        const isHtml = message.isHtml || message.isMarkdown; // Support both flags
+                        replaceChatMessage(message.messageId, message.content, isHtml);
                         break;
                     case 'renderMarkdownResponse':
                         handleMarkdownResponse(message.requestId, message.renderedHtml);
@@ -517,18 +518,49 @@ export class WebViewChatPanel {
                 const avatar = sender === 'user' ? '👤' : '🤖';
                 const timeStr = new Date().toLocaleTimeString();
                 
-                messageDiv.innerHTML = 
-                    '<div class="message-avatar">' + avatar + '</div>' +
-                    '<div class="message-content">' +
-                        '<div class="message-text">' + escapeHtml(text) + '</div>' +
-                        '<div class="message-footer">' +
-                            '<div class="message-actions">' +
-                                '<button class="action-btn copy-btn" data-message-id="' + actualMessageId + '">📋</button>' +
-                                '<button class="action-btn insert-btn" data-message-id="' + actualMessageId + '">📝</button>' +
-                            '</div>' +
-                            '<div class="message-time">' + timeStr + '</div>' +
-                        '</div>' +
-                    '</div>';
+                // Secure DOM construction instead of innerHTML
+                messageDiv.innerHTML = ''; // Clear first
+                
+                const avatarDiv = document.createElement('div');
+                avatarDiv.className = 'message-avatar';
+                avatarDiv.textContent = avatar;
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+                
+                const textDiv = document.createElement('div');
+                textDiv.className = 'message-text';
+                textDiv.textContent = text; // Safe text assignment
+                
+                const footerDiv = document.createElement('div');
+                footerDiv.className = 'message-footer';
+                
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'message-actions';
+                
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'action-btn copy-btn';
+                copyBtn.setAttribute('data-message-id', actualMessageId);
+                copyBtn.textContent = '📋';
+                
+                const insertBtn = document.createElement('button');
+                insertBtn.className = 'action-btn insert-btn';
+                insertBtn.setAttribute('data-message-id', actualMessageId);
+                insertBtn.textContent = '📝';
+                
+                const timeDiv = document.createElement('div');
+                timeDiv.className = 'message-time';
+                timeDiv.textContent = timeStr;
+                
+                // Assemble the structure
+                actionsDiv.appendChild(copyBtn);
+                actionsDiv.appendChild(insertBtn);
+                footerDiv.appendChild(actionsDiv);
+                footerDiv.appendChild(timeDiv);
+                contentDiv.appendChild(textDiv);
+                contentDiv.appendChild(footerDiv);
+                messageDiv.appendChild(avatarDiv);
+                messageDiv.appendChild(contentDiv);
 
                 messagesDiv.appendChild(messageDiv);
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -567,7 +599,59 @@ export class WebViewChatPanel {
                 }
             }
 
-            function replaceChatMessage(messageId, content, isMarkdown = false) {
+            // Helper function to create secure message structure
+            function createMessageStructure(content, messageId, isHtml = false) {
+                const container = document.createElement('div');
+                
+                const avatarDiv = document.createElement('div');
+                avatarDiv.className = 'message-avatar';
+                avatarDiv.textContent = '🤖';
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+                
+                const textDiv = document.createElement('div');
+                textDiv.className = 'message-text';
+                if (isHtml) {
+                    textDiv.innerHTML = content; // Content is already processed/sanitized
+                } else {
+                    textDiv.textContent = content; // Safe text assignment
+                }
+                
+                const footerDiv = document.createElement('div');
+                footerDiv.className = 'message-footer';
+                
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'message-actions';
+                
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'action-btn copy-btn';
+                copyBtn.setAttribute('data-message-id', messageId);
+                copyBtn.textContent = '📋';
+                
+                const insertBtn = document.createElement('button');
+                insertBtn.className = 'action-btn insert-btn';
+                insertBtn.setAttribute('data-message-id', messageId);
+                insertBtn.textContent = '📝';
+                
+                const timeDiv = document.createElement('div');
+                timeDiv.className = 'message-time';
+                timeDiv.textContent = new Date().toLocaleTimeString();
+                
+                // Assemble structure
+                actionsDiv.appendChild(copyBtn);
+                actionsDiv.appendChild(insertBtn);
+                footerDiv.appendChild(actionsDiv);
+                footerDiv.appendChild(timeDiv);
+                contentDiv.appendChild(textDiv);
+                contentDiv.appendChild(footerDiv);
+                container.appendChild(avatarDiv);
+                container.appendChild(contentDiv);
+                
+                return container;
+            }
+
+            function replaceChatMessage(messageId, content, isHtml = false) {
                 // Find the specific message by ID
                 let targetMessage = null;
                 if (messageId) {
@@ -586,38 +670,20 @@ export class WebViewChatPanel {
                     const currentMessageId = targetMessage.getAttribute('data-message-id') || ('msg-' + Date.now());
                     targetMessage.setAttribute('data-message-id', currentMessageId);
                     
-                    if (isMarkdown) {
-                        // Use shared async markdown rendering
-                        renderMarkdown(content, function(renderedContent) {
-                            const timeStr = new Date().toLocaleTimeString();
-                            targetMessage.innerHTML = 
-                                '<div class="message-avatar">🤖</div>' +
-                                '<div class="message-content">' +
-                                    '<div class="message-text">' + renderedContent + '</div>' +
-                                    '<div class="message-footer">' +
-                                        '<div class="message-actions">' +
-                                            '<button class="action-btn copy-btn" data-message-id="' + currentMessageId + '">📋</button>' +
-                                            '<button class="action-btn insert-btn" data-message-id="' + currentMessageId + '">📝</button>' +
-                                        '</div>' +
-                                '<div class="message-time">' + timeStr + '</div>' +
-                            '</div>' +
-                        '</div>';
-                        });
+                    if (isHtml) {
+                        // Content is already processed HTML (from markdown rendering)
+                        targetMessage.innerHTML = '';
+                        const newStructure = createMessageStructure(content, currentMessageId, true);
+                        while (newStructure.firstChild) {
+                            targetMessage.appendChild(newStructure.firstChild);
+                        }
                     } else {
-                        // Handle already-processed HTML content directly (no escaping needed)
-                        const timeStr = new Date().toLocaleTimeString();
-                        targetMessage.innerHTML = 
-                            '<div class="message-avatar">🤖</div>' +
-                            '<div class="message-content">' +
-                                '<div class="message-text">' + content + '</div>' +
-                                '<div class="message-footer">' +
-                                    '<div class="message-actions">' +
-                                        '<button class="action-btn copy-btn" data-message-id="' + currentMessageId + '">📋</button>' +
-                                        '<button class="action-btn insert-btn" data-message-id="' + currentMessageId + '">📝</button>' +
-                                    '</div>' +
-                            '<div class="message-time">' + timeStr + '</div>' +
-                                '</div>' +
-                            '</div>';
+                        // Handle text content securely
+                        targetMessage.innerHTML = '';
+                        const newStructure = createMessageStructure(content, currentMessageId, false);
+                        while (newStructure.firstChild) {
+                            targetMessage.appendChild(newStructure.firstChild);
+                        }
                     }
                 } else {
                     // Fallback: create new message if no existing message to replace
@@ -746,7 +812,7 @@ export class WebViewChatPanel {
                 command: 'replaceMessage',
                 messageId: typingMessageId,
                 content: processedContent,
-                isMarkdown: false  // Already processed as HTML
+                isHtml: true  // Flag as pre-processed HTML content
             });
             
         } catch (error) {
