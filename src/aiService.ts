@@ -1,6 +1,7 @@
 import { AIServiceResponse } from './types';
 import { ErrorHandler, withRetry } from './errorHandler';
 import { ConfigurationManager } from './configurationManager';
+import { AIResponseCache } from './responseCache';
 
 /**
  * Shared AI service for handling different AI providers
@@ -8,9 +9,11 @@ import { ConfigurationManager } from './configurationManager';
 export class AIService {
     private static _instance: AIService;
     private configManager: ConfigurationManager;
+    private responseCache: AIResponseCache;
 
     private constructor() {
         this.configManager = ConfigurationManager.getInstance();
+        this.responseCache = AIResponseCache.getInstance();
     }
 
     public static getInstance(): AIService {
@@ -22,7 +25,21 @@ export class AIService {
 
     public async getResponse(prompt: string, context: 'chat' | 'content' = 'content'): Promise<AIServiceResponse> {
         const config = this.configManager.getConfigSection('aiService');
+        
+        // Check cache first
+        const cachedResponse = this.responseCache.get(prompt, context);
+        if (cachedResponse) {
+            return { content: cachedResponse, source: 'openai' }; // Return cached with original source indicator
+        }
+
+        // Check for similar cached responses if exact match not found
+        const similarResponse = this.responseCache.findSimilar(prompt, context, 0.85);
+        if (similarResponse) {
+            return { content: similarResponse, source: 'openai' }; // Return similar cached response
+        }
+
         const provider = config.provider;
+        const startTime = Date.now();
 
         // Try the configured provider first, then fallback to others
         const providers = [provider, ...(['openai', 'local', 'claude'] as const).filter(p => p !== provider)];
@@ -40,6 +57,8 @@ export class AIService {
                             maxRetries,
                             1000
                         );
+                        // Cache the successful response
+                        this.responseCache.set(prompt, content, 'openai', context, Date.now() - startTime);
                         return { content, source: 'openai' };
 
                     case 'local':
@@ -49,10 +68,14 @@ export class AIService {
                             Math.min(maxRetries, 1), // Local AI gets fewer retries
                             500
                         );
+                        // Cache the successful response
+                        this.responseCache.set(prompt, content, 'local', context, Date.now() - startTime);
                         return { content, source: 'local' };
 
                     case 'claude':
                         content = await this._callClaudeAPI(prompt, context);
+                        // Cache the successful response
+                        this.responseCache.set(prompt, content, 'claude', context, Date.now() - startTime);
                         return { content, source: 'claude' };
                 }
             } catch (error) {
@@ -70,6 +93,8 @@ export class AIService {
         // For chat context, use fallback response system
         console.log('All external AI services unavailable, using fallback responses');
         const content = this._getFallbackResponse(prompt, context);
+        // Cache the fallback response to avoid recomputation
+        this.responseCache.set(prompt, content, 'fallback', context, Date.now() - startTime);
         return { content, source: 'fallback' };
     }
 

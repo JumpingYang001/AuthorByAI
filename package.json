@@ -53,6 +53,31 @@
         "command": "Author-AI-Assistant.resetConfiguration",
         "title": "$(refresh) Reset Configuration to Defaults",
         "category": "Book Writing"
+      },
+      {
+        "command": "Author-AI-Assistant.viewCacheStats",
+        "title": "$(graph) View Cache Statistics",
+        "category": "Book Writing"
+      },
+      {
+        "command": "Author-AI-Assistant.clearCache",
+        "title": "$(trash) Clear Response Cache",
+        "category": "Book Writing"
+      },
+      {
+        "command": "Author-AI-Assistant.cleanupCache",
+        "title": "$(clean) Cleanup Expired Cache",
+        "category": "Book Writing"
+      },
+      {
+        "command": "Author-AI-Assistant.exportCache",
+        "title": "$(export) Export Response Cache",
+        "category": "Book Writing"
+      },
+      {
+        "command": "Author-AI-Assistant.importCache",
+        "title": "$(import) Import Response Cache",
+        "category": "Book Writing"
       }
     ],
     "configuration": {

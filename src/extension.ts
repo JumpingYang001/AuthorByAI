@@ -10,6 +10,7 @@ import { ContentType, ContentGenerationRequest, WebviewMessage } from './types';
 import { sanitizeInput, sanitizeFilename, getFileExtension } from './utils';
 import { ErrorHandler } from './errorHandler';
 import { ConfigurationManager } from './configurationManager';
+import { AIResponseCache } from './responseCache';
 
 // Import webview providers
 import { BookWritingPanel } from './providers/mainPanel';
@@ -301,6 +302,131 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
+    // Register cache management commands
+    const viewCacheStatsCommand = vscode.commands.registerCommand('Author-AI-Assistant.viewCacheStats', async () => {
+        try {
+            const cache = AIResponseCache.getInstance();
+            const stats = cache.getStats();
+            
+            const statsMessage = `
+📊 AI Response Cache Statistics
+
+🎯 Performance:
+• Total Requests: ${stats.totalRequests}
+• Cache Hits: ${stats.cacheHits}
+• Cache Misses: ${stats.cacheMisses}
+• Hit Rate: ${stats.hitRate.toFixed(1)}%
+
+💰 Savings:
+• API Calls Saved: ${stats.totalSaved}
+• Estimated Cost Savings: $${(stats.totalSaved * 0.002).toFixed(2)}
+
+💾 Memory:
+• Memory Usage: ${(stats.memoryUsage / 1024).toFixed(1)} KB
+• Last Cleanup: ${new Date(stats.lastCleanup).toLocaleString()}
+
+⚡ Cache Contents:
+• Current Entries: ${cache.getCacheContents().length}
+            `.trim();
+            
+            vscode.window.showInformationMessage(statsMessage, { modal: true });
+        } catch (error) {
+            const extensionError = ErrorHandler.handle(error as Error, 'viewCacheStats');
+            await ErrorHandler.showError(extensionError);
+        }
+    });
+
+    const clearCacheCommand = vscode.commands.registerCommand('Author-AI-Assistant.clearCache', async () => {
+        try {
+            const action = await vscode.window.showWarningMessage(
+                'Are you sure you want to clear the AI response cache? This will remove all cached responses and may increase API usage.',
+                'Clear Cache',
+                'Cancel'
+            );
+
+            if (action === 'Clear Cache') {
+                const cache = AIResponseCache.getInstance();
+                cache.clear();
+                vscode.window.showInformationMessage('AI response cache cleared successfully!');
+            }
+        } catch (error) {
+            const extensionError = ErrorHandler.handle(error as Error, 'clearCache');
+            await ErrorHandler.showError(extensionError);
+        }
+    });
+
+    const cleanupCacheCommand = vscode.commands.registerCommand('Author-AI-Assistant.cleanupCache', async () => {
+        try {
+            const cache = AIResponseCache.getInstance();
+            const removedCount = cache.cleanup();
+            
+            if (removedCount > 0) {
+                vscode.window.showInformationMessage(`Cache cleanup completed! Removed ${removedCount} expired entries.`);
+            } else {
+                vscode.window.showInformationMessage('Cache cleanup completed! No expired entries found.');
+            }
+        } catch (error) {
+            const extensionError = ErrorHandler.handle(error as Error, 'cleanupCache');
+            await ErrorHandler.showError(extensionError);
+        }
+    });
+
+    const exportCacheCommand = vscode.commands.registerCommand('Author-AI-Assistant.exportCache', async () => {
+        try {
+            const cache = AIResponseCache.getInstance();
+            const cacheData = cache.exportCache();
+            
+            // Save to file
+            const saveUri = await vscode.window.showSaveDialog({
+                defaultUri: vscode.Uri.file('ai-response-cache.json'),
+                filters: {
+                    'JSON Files': ['json'],
+                    'All Files': ['*']
+                }
+            });
+            
+            if (saveUri) {
+                await vscode.workspace.fs.writeFile(saveUri, Buffer.from(cacheData, 'utf8'));
+                vscode.window.showInformationMessage('AI response cache exported successfully!');
+            }
+        } catch (error) {
+            const extensionError = ErrorHandler.handle(error as Error, 'exportCache');
+            await ErrorHandler.showError(extensionError);
+        }
+    });
+
+    const importCacheCommand = vscode.commands.registerCommand('Author-AI-Assistant.importCache', async () => {
+        try {
+            // Open file dialog
+            const openUri = await vscode.window.showOpenDialog({
+                canSelectFiles: true,
+                canSelectFolders: false,
+                canSelectMany: false,
+                filters: {
+                    'JSON Files': ['json'],
+                    'All Files': ['*']
+                }
+            });
+            
+            if (openUri && openUri[0]) {
+                const cacheData = await vscode.workspace.fs.readFile(openUri[0]);
+                const cacheJson = Buffer.from(cacheData).toString('utf8');
+                
+                const cache = AIResponseCache.getInstance();
+                const success = cache.importCache(cacheJson);
+                
+                if (success) {
+                    vscode.window.showInformationMessage('AI response cache imported successfully!');
+                } else {
+                    vscode.window.showErrorMessage('Failed to import cache data. Please check the file format.');
+                }
+            }
+        } catch (error) {
+            const extensionError = ErrorHandler.handle(error as Error, 'importCache');
+            await ErrorHandler.showError(extensionError);
+        }
+    });
+
     // Add all disposables to context
     context.subscriptions.push(
         createBookStructure,
@@ -312,7 +438,12 @@ export function activate(context: vscode.ExtensionContext) {
         openConfigurationCommand,
         exportConfigurationCommand,
         importConfigurationCommand,
-        resetConfigurationCommand
+        resetConfigurationCommand,
+        viewCacheStatsCommand,
+        clearCacheCommand,
+        cleanupCacheCommand,
+        exportCacheCommand,
+        importCacheCommand
     );
 }
 
@@ -321,4 +452,11 @@ export function activate(context: vscode.ExtensionContext) {
  */
 export function deactivate() {
     // Clean up resources
+    const configManager = ConfigurationManager.getInstance();
+    configManager.dispose();
+    
+    const cache = AIResponseCache.getInstance();
+    cache.dispose();
+    
+    console.log('Book Writing Assistant extension deactivated and resources cleaned up');
 }
