@@ -9,6 +9,7 @@ import { ConversationStorage } from './conversationStorage';
 import { ContentType, ContentGenerationRequest, WebviewMessage } from './types';
 import { sanitizeInput, sanitizeFilename, getFileExtension } from './utils';
 import { ErrorHandler } from './errorHandler';
+import { ConfigurationManager } from './configurationManager';
 
 // Import webview providers
 import { BookWritingPanel } from './providers/mainPanel';
@@ -19,6 +20,10 @@ import { WebViewChatPanel } from './webviewChatPanel';
  */
 export function activate(context: vscode.ExtensionContext) {
     console.log('Book Writing Assistant extension is now active!');
+
+    // Initialize configuration manager
+    const configManager = ConfigurationManager.getInstance();
+    console.log('Configuration manager initialized');
 
     // Initialize conversation storage
     ConversationStorage.getInstance(context);
@@ -199,6 +204,103 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
+    // Register configuration management commands
+    const openConfigurationCommand = vscode.commands.registerCommand('Author-AI-Assistant.openConfiguration', async () => {
+        try {
+            const configManager = ConfigurationManager.getInstance();
+            const config = configManager.getConfig();
+            
+            // Create a new document with current configuration as JSON
+            const configJson = JSON.stringify(config, null, 2);
+            const doc = await vscode.workspace.openTextDocument({
+                content: configJson,
+                language: 'json'
+            });
+            
+            await vscode.window.showTextDocument(doc);
+            vscode.window.showInformationMessage(
+                'Current configuration displayed. You can also modify settings via VS Code Settings (Ctrl+,) under "Author AI".',
+                'Open Settings'
+            ).then(choice => {
+                if (choice === 'Open Settings') {
+                    vscode.commands.executeCommand('workbench.action.openSettings', 'authorAI');
+                }
+            });
+        } catch (error) {
+            const extensionError = ErrorHandler.handle(error as Error, 'openConfiguration');
+            await ErrorHandler.showError(extensionError);
+        }
+    });
+
+    const exportConfigurationCommand = vscode.commands.registerCommand('Author-AI-Assistant.exportConfiguration', async () => {
+        try {
+            const configManager = ConfigurationManager.getInstance();
+            const configData = {
+                version: "1.0.0",
+                timestamp: new Date().toISOString(),
+                config: configManager.getConfig(),
+                metadata: {
+                    extensionVersion: "0.0.1",
+                    platform: process.platform,
+                    exportSource: "user_command"
+                }
+            };
+            
+            // Save to file
+            const saveUri = await vscode.window.showSaveDialog({
+                defaultUri: vscode.Uri.file('author-ai-config.json'),
+                filters: {
+                    'JSON Files': ['json'],
+                    'All Files': ['*']
+                }
+            });
+            
+            if (saveUri) {
+                await vscode.workspace.fs.writeFile(saveUri, Buffer.from(JSON.stringify(configData, null, 2), 'utf8'));
+                vscode.window.showInformationMessage('Configuration exported successfully!');
+            }
+        } catch (error) {
+            const extensionError = ErrorHandler.handle(error as Error, 'exportConfiguration');
+            await ErrorHandler.showError(extensionError);
+        }
+    });
+
+    const importConfigurationCommand = vscode.commands.registerCommand('Author-AI-Assistant.importConfiguration', async () => {
+        try {
+            // Open file dialog
+            const openUri = await vscode.window.showOpenDialog({
+                canSelectFiles: true,
+                canSelectFolders: false,
+                canSelectMany: false,
+                filters: {
+                    'JSON Files': ['json'],
+                    'All Files': ['*']
+                }
+            });
+            
+            if (openUri && openUri[0]) {
+                const configData = await vscode.workspace.fs.readFile(openUri[0]);
+                const configJson = Buffer.from(configData).toString('utf8');
+                
+                const configManager = ConfigurationManager.getInstance();
+                await configManager.importConfig(configJson);
+            }
+        } catch (error) {
+            const extensionError = ErrorHandler.handle(error as Error, 'importConfiguration');
+            await ErrorHandler.showError(extensionError);
+        }
+    });
+
+    const resetConfigurationCommand = vscode.commands.registerCommand('Author-AI-Assistant.resetConfiguration', async () => {
+        try {
+            const configManager = ConfigurationManager.getInstance();
+            await configManager.resetToDefaults();
+        } catch (error) {
+            const extensionError = ErrorHandler.handle(error as Error, 'resetConfiguration');
+            await ErrorHandler.showError(extensionError);
+        }
+    });
+
     // Add all disposables to context
     context.subscriptions.push(
         createBookStructure,
@@ -206,7 +308,11 @@ export function activate(context: vscode.ExtensionContext) {
         openChatAssistant,
         openContentGenerator,
         insertAtCursor,
-        createFileFromCode
+        createFileFromCode,
+        openConfigurationCommand,
+        exportConfigurationCommand,
+        importConfigurationCommand,
+        resetConfigurationCommand
     );
 }
 

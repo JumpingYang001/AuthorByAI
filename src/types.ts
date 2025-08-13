@@ -95,3 +95,31 @@ export interface InputValidationError {
     message: string;
     code: 'INVALID_TYPE' | 'TOO_LONG' | 'TOO_SHORT' | 'INVALID_CHARS' | 'RATE_LIMITED' | 'DANGEROUS_CONTENT';
 }
+
+// Configuration management types
+export interface ExtensionConfigurationUpdate {
+    section: string;
+    key: string;
+    value: any;
+    source: 'user' | 'import' | 'reset' | 'migration';
+    timestamp: Date;
+}
+
+export interface ConfigurationValidationError {
+    section: string;
+    key: string;
+    value: any;
+    error: string;
+    rule?: string;
+}
+
+export interface ConfigurationExportData {
+    version: string;
+    timestamp: string;
+    config: any;
+    metadata: {
+        extensionVersion: string;
+        platform: string;
+        exportSource: string;
+    };
+}

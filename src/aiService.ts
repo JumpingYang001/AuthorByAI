@@ -1,11 +1,17 @@
 import { AIServiceResponse } from './types';
 import { ErrorHandler, withRetry } from './errorHandler';
+import { ConfigurationManager } from './configurationManager';
 
 /**
  * Shared AI service for handling different AI providers
  */
 export class AIService {
     private static _instance: AIService;
+    private configManager: ConfigurationManager;
+
+    private constructor() {
+        this.configManager = ConfigurationManager.getInstance();
+    }
 
     public static getInstance(): AIService {
         if (!AIService._instance) {
@@ -15,38 +21,45 @@ export class AIService {
     }
 
     public async getResponse(prompt: string, context: 'chat' | 'content' = 'content'): Promise<AIServiceResponse> {
-        // Try different AI services in order of preference with proper error handling
-        try {
-            const content = await withRetry(
-                () => this._callOpenAI(prompt, context),
-                'OpenAI API Call',
-                2,
-                1000
-            );
-            return { content, source: 'openai' };
-        } catch (error) {
-            const openAIError = ErrorHandler.handleAIError(error, 'OpenAI');
-            console.log('OpenAI failed:', openAIError.message);
-        }
+        const config = this.configManager.getConfigSection('aiService');
+        const provider = config.provider;
 
-        try {
-            const content = await withRetry(
-                () => this._callLocalAI(prompt, context),
-                'Local AI Call',
-                1,
-                500
-            );
-            return { content, source: 'local' };
-        } catch (error) {
-            const localAIError = ErrorHandler.handleAIError(error, 'Local AI');
-            console.log('Local AI failed:', localAIError.message);
-        }
+        // Try the configured provider first, then fallback to others
+        const providers = [provider, ...(['openai', 'local', 'claude'] as const).filter(p => p !== provider)];
 
-        try {
-            const content = await this._callClaudeAPI(prompt, context);
-            return { content, source: 'claude' };
-        } catch (error) {
-            console.log('Claude failed:', error);
+        for (const currentProvider of providers) {
+            try {
+                let content: string;
+                const maxRetries = config.retryAttempts;
+
+                switch (currentProvider) {
+                    case 'openai':
+                        content = await withRetry(
+                            () => this._callOpenAI(prompt, context),
+                            'OpenAI API Call',
+                            maxRetries,
+                            1000
+                        );
+                        return { content, source: 'openai' };
+
+                    case 'local':
+                        content = await withRetry(
+                            () => this._callLocalAI(prompt, context),
+                            'Local AI Call',
+                            Math.min(maxRetries, 1), // Local AI gets fewer retries
+                            500
+                        );
+                        return { content, source: 'local' };
+
+                    case 'claude':
+                        content = await this._callClaudeAPI(prompt, context);
+                        return { content, source: 'claude' };
+                }
+            } catch (error) {
+                const aiError = ErrorHandler.handleAIError(error, currentProvider);
+                console.log(`${currentProvider} failed:`, aiError.message);
+                // Continue to next provider
+            }
         }
 
         // For content generation context, throw an error to trigger template fallback in the main panel
@@ -66,13 +79,17 @@ export class AIService {
             throw new Error('OpenAI API key not configured');
         }
 
+        const config = this.configManager.getConfigSection('aiService');
         const systemMessage = context === 'chat' 
             ? this._getChatSystemMessage()
             : this._getContentSystemMessage();
 
-        const maxTokens = context === 'chat' ? 1500 : 3000;
+        const maxTokens = Math.min(config.maxTokens, context === 'chat' ? 1500 : 3000);
 
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+
             const response = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -86,9 +103,12 @@ export class AIService {
                         { role: 'user', content: prompt }
                     ],
                     max_tokens: maxTokens,
-                    temperature: 0.7
-                })
+                    temperature: config.temperature
+                }),
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 throw new Error(`OpenAI API error: ${response.status}`);
@@ -104,12 +124,18 @@ export class AIService {
     }
 
     private async _callLocalAI(prompt: string, context: 'chat' | 'content'): Promise<string> {
+        const config = this.configManager.getConfigSection('aiService');
+        const baseUrl = config.baseUrl || 'http://localhost:11434';
+        
         const systemPrompt = context === 'chat'
             ? `You are a book writing assistant for VS Code sidebar. Provide concise, helpful advice about educational content creation.`
             : `You are a professional book writing assistant specializing in educational content. Create structured, pedagogically sound learning materials in markdown format. Follow format specifications exactly and include practical examples, clear explanations, and actionable content.`;
 
         try {
-            const response = await fetch('http://localhost:11434/api/generate', {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+
+            const response = await fetch(`${baseUrl}/api/generate`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -117,9 +143,16 @@ export class AIService {
                 body: JSON.stringify({
                     model: 'llama2',
                     prompt: `${systemPrompt}\n\nUser Request: ${prompt}\n\nResponse:`,
-                    stream: false
-                })
+                    stream: false,
+                    options: {
+                        temperature: config.temperature,
+                        num_predict: Math.min(config.maxTokens, 2000) // Local AI typically has lower limits
+                    }
+                }),
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 throw new Error(`Local AI error: ${response.status}`);

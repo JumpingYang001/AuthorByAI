@@ -6,6 +6,7 @@ import { validateUserMessage, sanitizeInput, RateLimiter } from './utils';
 import { ValidationResult, RateLimitResult } from './types';
 import { AIService } from './aiService';
 import { ErrorHandler } from './errorHandler';
+import { ConfigurationManager } from './configurationManager';
 
 /**
  * WebView Chat Panel - Handles the combined chat interface

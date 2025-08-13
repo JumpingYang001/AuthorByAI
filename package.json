@@ -33,8 +33,173 @@
         "command": "Author-AI-Assistant.clearConversation",
         "title": "$(trash) Clear Chat History",
         "category": "Book Writing"
+      },
+      {
+        "command": "Author-AI-Assistant.openConfiguration",
+        "title": "$(gear) View Current Configuration",
+        "category": "Book Writing"
+      },
+      {
+        "command": "Author-AI-Assistant.exportConfiguration",
+        "title": "$(export) Export Configuration",
+        "category": "Book Writing"
+      },
+      {
+        "command": "Author-AI-Assistant.importConfiguration",
+        "title": "$(import) Import Configuration",
+        "category": "Book Writing"
+      },
+      {
+        "command": "Author-AI-Assistant.resetConfiguration",
+        "title": "$(refresh) Reset Configuration to Defaults",
+        "category": "Book Writing"
       }
     ],
+    "configuration": {
+      "title": "Author AI",
+      "properties": {
+        "authorAI.aiService.provider": {
+          "type": "string",
+          "enum": ["openai", "claude", "local"],
+          "default": "openai",
+          "description": "Primary AI service provider to use"
+        },
+        "authorAI.aiService.timeout": {
+          "type": "number",
+          "default": 30000,
+          "minimum": 1000,
+          "maximum": 120000,
+          "description": "Request timeout in milliseconds (1-120 seconds)"
+        },
+        "authorAI.aiService.retryAttempts": {
+          "type": "number",
+          "default": 3,
+          "minimum": 0,
+          "maximum": 10,
+          "description": "Number of retry attempts for failed requests"
+        },
+        "authorAI.aiService.maxTokens": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 10,
+          "maximum": 8000,
+          "description": "Maximum tokens for AI responses"
+        },
+        "authorAI.aiService.temperature": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0,
+          "maximum": 2,
+          "description": "AI response creativity (0 = deterministic, 2 = very creative)"
+        },
+        "authorAI.aiService.baseUrl": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Base URL for local AI service (e.g., Ollama)"
+        },
+        "authorAI.ui.maxConversationHistory": {
+          "type": "number",
+          "default": 100,
+          "minimum": 10,
+          "maximum": 1000,
+          "description": "Maximum number of messages to keep in conversation history"
+        },
+        "authorAI.ui.autoSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically save generated content to files"
+        },
+        "authorAI.ui.theme": {
+          "type": "string",
+          "enum": ["auto", "light", "dark"],
+          "default": "auto",
+          "description": "Theme preference for the extension UI"
+        },
+        "authorAI.ui.enableSyntaxHighlighting": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable syntax highlighting in code blocks"
+        },
+        "authorAI.ui.showTimestamps": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show timestamps in conversation messages"
+        },
+        "authorAI.content.defaultContentType": {
+          "type": "string",
+          "enum": ["chapter", "lesson", "exercise", "quiz", "summary"],
+          "default": "chapter",
+          "description": "Default content type for generation"
+        },
+        "authorAI.content.defaultDomain": {
+          "type": "string",
+          "default": "Educational Content",
+          "description": "Default domain/subject area for content generation"
+        },
+        "authorAI.content.enableAutoExpansion": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically expand content with additional sections"
+        },
+        "authorAI.content.maxContentLength": {
+          "type": "number",
+          "default": 10000,
+          "minimum": 100,
+          "maximum": 50000,
+          "description": "Maximum length for generated content"
+        },
+        "authorAI.security.enableInputSanitization": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable input sanitization for security"
+        },
+        "authorAI.security.maxInputLength": {
+          "type": "number",
+          "default": 1000,
+          "minimum": 10,
+          "maximum": 10000,
+          "description": "Maximum length for user input"
+        },
+        "authorAI.security.rateLimitRequests": {
+          "type": "number",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Maximum requests per rate limit window"
+        },
+        "authorAI.security.rateLimitWindow": {
+          "type": "number",
+          "default": 60000,
+          "minimum": 1000,
+          "maximum": 3600000,
+          "description": "Rate limit window in milliseconds"
+        },
+        "authorAI.performance.enableCaching": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable response caching for better performance"
+        },
+        "authorAI.performance.cacheTimeout": {
+          "type": "number",
+          "default": 300000,
+          "minimum": 10000,
+          "maximum": 3600000,
+          "description": "Cache timeout in milliseconds"
+        },
+        "authorAI.performance.maxCacheSize": {
+          "type": "number",
+          "default": 50,
+          "minimum": 1,
+          "maximum": 500,
+          "description": "Maximum number of cached responses"
+        },
+        "authorAI.performance.enableVirtualization": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable conversation virtualization for large chats"
+        }
+      }
+    },
     "keybindings": [
       {
         "command": "Author-AI-Assistant.createBookStructure",
