@@ -1,4 +1,5 @@
 import { AIServiceResponse } from './types';
+import { ErrorHandler, withRetry } from './errorHandler';
 
 /**
  * Shared AI service for handling different AI providers
@@ -14,19 +15,31 @@ export class AIService {
     }
 
     public async getResponse(prompt: string, context: 'chat' | 'content' = 'content'): Promise<AIServiceResponse> {
-        // Try different AI services in order of preference
+        // Try different AI services in order of preference with proper error handling
         try {
-            const content = await this._callOpenAI(prompt, context);
+            const content = await withRetry(
+                () => this._callOpenAI(prompt, context),
+                'OpenAI API Call',
+                2,
+                1000
+            );
             return { content, source: 'openai' };
         } catch (error) {
-            console.log('OpenAI failed, trying other options:', error);
+            const openAIError = ErrorHandler.handleAIError(error, 'OpenAI');
+            console.log('OpenAI failed:', openAIError.message);
         }
 
         try {
-            const content = await this._callLocalAI(prompt, context);
+            const content = await withRetry(
+                () => this._callLocalAI(prompt, context),
+                'Local AI Call',
+                1,
+                500
+            );
             return { content, source: 'local' };
         } catch (error) {
-            console.log('Local AI failed:', error);
+            const localAIError = ErrorHandler.handleAIError(error, 'Local AI');
+            console.log('Local AI failed:', localAIError.message);
         }
 
         try {

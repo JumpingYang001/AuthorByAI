@@ -69,8 +69,8 @@ export class BookStructureService {
             // Open the book outline file
             await this._openBookOutline(workspaceFolder.uri);
 
-            // Automatically open the Book Writing Assistant sidebar for immediate use
-            await this._openBookWritingSidebar();
+            // Automatically open the Book Writing Assistant for immediate use
+            await this._openBookWritingAssistant();
 
         } catch (error) {
             console.error('Error creating book structure:', error);
@@ -371,16 +371,16 @@ By the end of this book, readers will be able to:
     }
 
     /**
-     * Opens the Book Writing Assistant sidebar for immediate use
+     * Opens the Book Writing Assistant for immediate use
      */
-    private async _openBookWritingSidebar(): Promise<void> {
-        // Open the Book Writing Assistant sidebar
-        await vscode.commands.executeCommand('workbench.view.extension.bookWriting');
+    private async _openBookWritingAssistant(): Promise<void> {
+        // Open the Book Writing Assistant chat panel
+        await vscode.commands.executeCommand('Author-AI-Assistant.openChatPanel');
         
-        // Wait a moment for the sidebar to load, then show a helpful tip
+        // Wait a moment for the panel to load, then show a helpful tip
         setTimeout(() => {
             vscode.window.showInformationMessage(
-                '📚 Book Writing Assistant sidebar is now open! Use the Content Generator to start creating chapters, exercises, and more.',
+                '📚 Book Writing Assistant is now open! Use the chat interface or Content Generator to start creating chapters, exercises, and more.',
                 'Got it!'
             );
         }, 1000);

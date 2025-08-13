@@ -5,6 +5,7 @@ import { BookWritingPanel } from './providers/mainPanel';
 import { validateUserMessage, sanitizeInput, RateLimiter } from './utils';
 import { ValidationResult, RateLimitResult } from './types';
 import { AIService } from './aiService';
+import { ErrorHandler } from './errorHandler';
 
 /**
  * WebView Chat Panel - Handles the combined chat interface
@@ -69,8 +70,8 @@ export class WebViewChatPanel {
                     }
                 } catch (error) {
                     console.error('Error inserting content:', error);
-                    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-                    vscode.window.showErrorMessage('Failed to insert content: ' + errorMessage);
+                    const extensionError = ErrorHandler.handle(error, 'Insert at Cursor');
+                    await ErrorHandler.showError(extensionError);
                 }
                 break;
             case 'createFile':
@@ -80,7 +81,8 @@ export class WebViewChatPanel {
                     // Focus should automatically be on the new file created by the command
                 } catch (error) {
                     console.error('Error creating file:', error);
-                    vscode.window.showErrorMessage('Failed to create file from code');
+                    const extensionError = ErrorHandler.handleFileError(error, 'Create File from Code');
+                    await ErrorHandler.showError(extensionError);
                 }
                 break;
             case 'openContentGenerator':
@@ -864,12 +866,19 @@ export class WebViewChatPanel {
             
         } catch (error) {
             console.error('Error in chat response:', error);
+            const extensionError = ErrorHandler.handleAIError(error, 'Chat Response');
+            
             webview.postMessage({
                 command: 'replaceMessage',
                 messageId: 'typing-' + Date.now(),
-                content: 'Sorry, I encountered an error while processing your request. Please try again.',
+                content: extensionError.userMessage,
                 isMarkdown: false
             });
+            
+            // Show detailed error if it's not retryable or user wants details
+            if (!extensionError.retryable) {
+                await ErrorHandler.showError(extensionError, false);
+            }
         }
     }
 

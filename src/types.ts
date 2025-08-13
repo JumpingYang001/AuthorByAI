@@ -70,6 +70,17 @@ export interface RateLimitResult {
     retryAfter?: number;
 }
 
+// Error handling interfaces
+export interface ExtensionError {
+    code: string;
+    message: string;
+    userMessage: string;
+    retryable: boolean;
+    context?: string;
+    originalError?: Error;
+    timestamp: number;
+}
+
 // Security and validation types
 export interface SecurityConfig {
     maxMessageLength: number;

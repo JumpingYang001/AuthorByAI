@@ -8,6 +8,7 @@ import { BookStructureService } from './bookStructureService';
 import { ConversationStorage } from './conversationStorage';
 import { ContentType, ContentGenerationRequest, WebviewMessage } from './types';
 import { sanitizeInput, sanitizeFilename, getFileExtension } from './utils';
+import { ErrorHandler } from './errorHandler';
 
 // Import webview providers
 import { BookWritingPanel } from './providers/mainPanel';
@@ -192,7 +193,9 @@ export function activate(context: vscode.ExtensionContext) {
                 }
             }
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to create file: ${error}`);
+            console.error('Error in createFileFromCode:', error);
+            const extensionError = ErrorHandler.handleFileError(error, 'Create File from Code');
+            await ErrorHandler.showError(extensionError);
         }
     });
 

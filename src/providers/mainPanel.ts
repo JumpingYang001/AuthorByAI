@@ -6,6 +6,7 @@ import { TemplateService } from '../templateService';
 import { PromptBuilder } from '../promptBuilder';
 import { ContentType } from '../types';
 import { validateContentType, validateTopicOrDomain, sanitizeFilename, RateLimiter } from '../utils';
+import { ErrorHandler } from '../errorHandler';
 
 /**
  * Main Book Writing Panel Provider
