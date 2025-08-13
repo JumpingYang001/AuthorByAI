@@ -149,14 +149,14 @@ export class ConfigurationManager {
      * Get the current configuration
      */
     public getConfig(): ExtensionConfig {
-        return { ...this._config }; // Return a copy to prevent mutations
+        return JSON.parse(JSON.stringify(this._config)); // Return a deep copy to prevent mutations
     }
 
     /**
      * Get a specific configuration section
      */
     public getConfigSection<T extends keyof ExtensionConfig>(section: T): ExtensionConfig[T] {
-        return { ...this._config[section] };
+        return JSON.parse(JSON.stringify(this._config[section])); // Return a deep copy
     }
 
     /**

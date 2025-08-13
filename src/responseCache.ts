@@ -10,6 +10,7 @@ interface CacheEntry {
     source: 'openai' | 'claude' | 'local' | 'template' | 'fallback';
     metadata: {
         promptHash: string;
+        originalPrompt: string; // Store original prompt for similarity comparison
         context: 'chat' | 'content';
         tokenCount?: number;
         responseTime?: number;
@@ -131,6 +132,7 @@ export class AIResponseCache {
                 source,
                 metadata: {
                     promptHash: this._hashString(prompt),
+                    originalPrompt: prompt, // Store original prompt for similarity comparison
                     context,
                     tokenCount: this._estimateTokenCount(response),
                     responseTime
@@ -226,8 +228,8 @@ export class AIResponseCache {
                     continue;
                 }
 
-                // Extract original prompt from cache key (simplified)
-                const cachedPrompt = key.split('|')[0];
+                // Use stored original prompt for similarity comparison
+                const cachedPrompt = entry.metadata.originalPrompt;
                 const cachedWords = this._tokenizePrompt(cachedPrompt.toLowerCase());
                 
                 const similarity = this._calculateSimilarity(promptWords, cachedWords);
