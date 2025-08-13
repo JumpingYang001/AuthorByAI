@@ -3,12 +3,31 @@
  */
 
 /**
- * Enhanced markdown renderer with syntax highlighting
+ * Enhanced markdown renderer with syntax highlighting and math support
  */
 export function renderMarkdownContent(text: string): string {
     let html = text;
     
-    // Code blocks with syntax highlighting - handle these first
+    // Store math expressions to protect them from other processing
+    const mathExpressions: string[] = [];
+    
+    // Handle display math blocks ($$...$$) first
+    html = html.replace(/\$\$([\s\S]*?)\$\$/g, function(match, expression) {
+        const mathHtml = renderMathExpression(expression.trim(), true);
+        const placeholder = 'MATHBLOCKPLACEHOLDER' + mathExpressions.length + 'ENDPLACEHOLDER';
+        mathExpressions.push(mathHtml);
+        return placeholder;
+    });
+    
+    // Handle inline math ($...$) - but not if it's part of a display block
+    html = html.replace(/(?<!\$)\$([^$\n]+?)\$(?!\$)/g, function(match, expression) {
+        const mathHtml = renderMathExpression(expression.trim(), false);
+        const placeholder = 'MATHINLINEPLACEHOLDER' + mathExpressions.length + 'ENDPLACEHOLDER';
+        mathExpressions.push(mathHtml);
+        return placeholder;
+    });
+    
+    // Code blocks with syntax highlighting - handle these after math
     const codeBlockRegex = /```([\w]*)\n?([\s\S]*?)\n?```/g;
     
     // Store code blocks with placeholders to protect them from line break processing
@@ -48,11 +67,11 @@ export function renderMarkdownContent(text: string): string {
         return placeholder;
     });
     
-    // Now escape HTML for the rest of the content (outside code blocks)
+    // Now escape HTML for the rest of the content (outside code blocks and math)
     html = html
         .replace(/&(?!amp;|lt;|gt;|quot;|#39;)/g, '&amp;')
-        .replace(/<(?!\/?(span|pre|code|h[1-6]|strong|em|ul|ol|li|blockquote|a)\b[^>]*>)/g, '&lt;')
-        .replace(/>(?![^<]*<\/(span|pre|code|h[1-6]|strong|em|ul|ol|li|blockquote|a)>)/g, '&gt;');
+        .replace(/<(?!\/?(span|pre|code|h[1-6]|strong|em|ul|ol|li|blockquote|a|div)\b[^>]*>)/g, '&lt;')
+        .replace(/>(?![^<]*<\/(span|pre|code|h[1-6]|strong|em|ul|ol|li|blockquote|a|div)>)/g, '&gt;');
     
     // Headers with enhanced styling (process from longest to shortest to avoid conflicts)
     html = html.replace(/^###### (.+)$/gm, '<h6 style="font-size: 0.85em; font-weight: 600; margin: 16px 0 8px 0; color: var(--vscode-descriptionForeground); line-height: 1.3;">$1</h6>');
@@ -154,6 +173,14 @@ export function renderMarkdownContent(text: string): string {
     // Line breaks
     html = html.replace(/\n/g, '<br>');
     
+    // Restore math expressions
+    mathExpressions.forEach((mathHtml, index) => {
+        const blockPlaceholder = 'MATHBLOCKPLACEHOLDER' + index + 'ENDPLACEHOLDER';
+        const inlinePlaceholder = 'MATHINLINEPLACEHOLDER' + index + 'ENDPLACEHOLDER';
+        html = html.replace(blockPlaceholder, mathHtml);
+        html = html.replace(inlinePlaceholder, mathHtml);
+    });
+    
     // Restore code blocks
     codeBlocks.forEach((block, index) => {
         const placeholder = 'CODEBLOCKPLACEHOLDER' + index + 'ENDPLACEHOLDER';
@@ -164,4 +191,149 @@ export function renderMarkdownContent(text: string): string {
     console.log('Final HTML after code block restoration:', html.substring(0, 500));
     
     return html;
+}
+
+/**
+ * Render mathematical expressions using a simple LaTeX-like syntax
+ * This provides basic math rendering without external dependencies
+ */
+function renderMathExpression(expression: string, isDisplayMode: boolean): string {
+    let mathHtml = expression;
+    
+    // Basic LaTeX symbol replacements
+    const symbolMap: { [key: string]: string } = {
+        '\\\\frac': 'frac',  // Handle escaped backslashes from templates
+        '\\frac': 'frac',
+        '\\int': '∫',
+        '\\sum': '∑',
+        '\\prod': '∏',
+        '\\sqrt': '√',
+        '\\alpha': 'α',
+        '\\beta': 'β',
+        '\\gamma': 'γ',
+        '\\delta': 'δ',
+        '\\epsilon': 'ε',
+        '\\pi': 'π',
+        '\\theta': 'θ',
+        '\\lambda': 'λ',
+        '\\mu': 'μ',
+        '\\sigma': 'σ',
+        '\\phi': 'φ',
+        '\\chi': 'χ',
+        '\\psi': 'ψ',
+        '\\omega': 'ω',
+        '\\infty': '∞',
+        '\\pm': '±',
+        '\\times': '×',
+        '\\div': '÷',
+        '\\cdot': '·',
+        '\\neq': '≠',
+        '\\leq': '≤',
+        '\\geq': '≥',
+        '\\to': '→',
+        '\\leftarrow': '←',
+        '\\rightarrow': '→',
+        '\\Rightarrow': '⇒',
+        '\\partial': '∂',
+        '\\lim': 'lim'
+    };
+    
+    // Replace symbols
+    for (const [latex, unicode] of Object.entries(symbolMap)) {
+        mathHtml = mathHtml.replace(new RegExp(latex, 'g'), unicode);
+    }
+    
+    // Handle fractions: frac{numerator}{denominator}
+    mathHtml = mathHtml.replace(/frac\{([^}]+)\}\{([^}]+)\}/g, function(match, num, den) {
+        return `<span class="math-fraction"><span class="math-numerator">${num}</span><span class="math-fraction-line"></span><span class="math-denominator">${den}</span></span>`;
+    });
+    
+    // Handle square roots: sqrt{content}
+    mathHtml = mathHtml.replace(/√\{([^}]+)\}/g, function(match, content) {
+        return `<span class="math-sqrt">√<span class="math-sqrt-content">${content}</span></span>`;
+    });
+    
+    // Handle superscripts: x^{power} or x^power
+    mathHtml = mathHtml.replace(/([a-zA-Z0-9π∞])\^(\{[^}]+\}|[a-zA-Z0-9+-])/g, function(match, base, power) {
+        const cleanPower = power.replace(/[{}]/g, '');
+        return `${base}<sup style="font-size: 0.8em; vertical-align: super; line-height: 1;">${cleanPower}</sup>`;
+    });
+    
+    // Handle subscripts: x_{sub} or x_sub
+    mathHtml = mathHtml.replace(/([a-zA-Z0-9π∞])_(\{[^}]+\}|[a-zA-Z0-9+-])/g, function(match, base, sub) {
+        const cleanSub = sub.replace(/[{}]/g, '');
+        return `${base}<sub style="font-size: 0.8em; vertical-align: sub; line-height: 1;">${cleanSub}</sub>`;
+    });
+    
+    // Handle integrals with limits: int_lower^upper
+    mathHtml = mathHtml.replace(/∫_(\{[^}]+\}|[a-zA-Z0-9π∞+-]+)\^(\{[^}]+\}|[a-zA-Z0-9π∞+-]+)/g, function(match, lower, upper) {
+        const cleanLower = lower.replace(/[{}]/g, '');
+        const cleanUpper = upper.replace(/[{}]/g, '');
+        return `<span class="math-integral">∫<sub style="font-size: 0.7em; margin-left: 2px;">${cleanLower}</sub><sup style="font-size: 0.7em; margin-left: 2px;">${cleanUpper}</sup></span>`;
+    });
+    
+    // Handle sums with limits: sum_lower^upper
+    mathHtml = mathHtml.replace(/∑_(\{[^}]+\}|[a-zA-Z0-9π∞+-]+)\^(\{[^}]+\}|[a-zA-Z0-9π∞+-]+)/g, function(match, lower, upper) {
+        const cleanLower = lower.replace(/[{}]/g, '');
+        const cleanUpper = upper.replace(/[{}]/g, '');
+        return `<span class="math-sum">∑<sub style="font-size: 0.7em;">${cleanLower}</sub><sup style="font-size: 0.7em;">${cleanUpper}</sup></span>`;
+    });
+    
+    // Handle parentheses and brackets sizing
+    mathHtml = mathHtml.replace(/\\left\(/g, '<span style="font-size: 1.2em;">(</span>');
+    mathHtml = mathHtml.replace(/\\right\)/g, '<span style="font-size: 1.2em;">)</span>');
+    mathHtml = mathHtml.replace(/\\left\[/g, '<span style="font-size: 1.2em;">[</span>');
+    mathHtml = mathHtml.replace(/\\right\]/g, '<span style="font-size: 1.2em;">]</span>');
+    
+    // Clean up any remaining LaTeX syntax
+    mathHtml = mathHtml.replace(/\\\\/g, '');  // Remove escaped backslashes
+    mathHtml = mathHtml.replace(/\{([^}]+)\}/g, '$1');  // Remove remaining braces
+    
+    const containerStyle = isDisplayMode 
+        ? 'display: block; text-align: center; margin: 16px 0; font-size: 1.2em; padding: 12px; background: var(--vscode-textCodeBlock-background); border-radius: 6px; border: 1px solid var(--vscode-panel-border);'
+        : 'display: inline; margin: 0 2px; font-size: 1.05em; background: var(--vscode-textCodeBlock-background); padding: 2px 4px; border-radius: 3px;';
+    
+    return `<div class="math-expression" style="${containerStyle}">
+        <span style="font-family: 'Times New Roman', serif; font-style: italic; color: var(--vscode-foreground);">
+            ${mathHtml}
+        </span>
+        <style>
+            .math-fraction {
+                display: inline-block;
+                vertical-align: middle;
+                text-align: center;
+                position: relative;
+                margin: 0 3px;
+            }
+            .math-numerator, .math-denominator {
+                display: block;
+                font-size: 0.9em;
+                line-height: 1.2;
+            }
+            .math-fraction-line {
+                display: block;
+                height: 1px;
+                background: var(--vscode-foreground);
+                margin: 2px 0;
+            }
+            .math-sqrt {
+                position: relative;
+                margin: 0 2px;
+            }
+            .math-sqrt-content {
+                border-top: 1px solid var(--vscode-foreground);
+                padding-top: 2px;
+                margin-left: 2px;
+            }
+            .math-integral, .math-sum {
+                position: relative;
+                display: inline-block;
+                vertical-align: middle;
+                margin: 0 2px;
+            }
+            .math-expression {
+                color: var(--vscode-foreground);
+            }
+        </style>
+    </div>`;
 }

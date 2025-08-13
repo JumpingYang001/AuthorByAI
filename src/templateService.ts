@@ -705,6 +705,60 @@ def hello_world():
 result = hello_world()
 \`\`\`
 
+## Mathematical Expressions
+
+### Inline Math
+Use dollar signs for inline math: $f(x) = x^2 + 2x + 1$
+
+### Display Math Blocks
+Use double dollar signs for centered equations:
+
+$$\\frac{d}{dx}[x^n] = nx^{n-1}$$
+
+$$\\int_0^1 x^2 dx = \\frac{1}{3}$$
+
+### Calculus Examples
+
+**Derivative of polynomial:**
+$$f(x) = 3x^3 - 2x^2 + x - 5$$
+$$f'(x) = 9x^2 - 4x + 1$$
+
+**Integral with limits:**
+$$\\int_0^{\\pi} \\sin(x) dx = [-\\cos(x)]_0^{\\pi} = 2$$
+
+**Chain rule:**
+$$\\frac{d}{dx}[\\sin(x^2)] = \\cos(x^2) \\cdot 2x$$
+
+### Function Graphs (ASCII Art)
+\`\`\`
+f(x) = x²
+
+     |
+   4 +     *
+     |   *   *
+   3 +  *     *
+     | *       *
+   2 + *       *
+     |*         *
+   1 +           *
+     |             *
+   0 +---+---+---+---+-> x
+     0   1   2   3   4
+
+Parabola opening upward
+\`\`\`
+
+### Complex Mathematical Expressions
+
+**Quadratic Formula:**
+$$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$
+
+**Taylor Series:**
+$$e^x = \\sum_{n=0}^{\\infty} \\frac{x^n}{n!} = 1 + x + \\frac{x^2}{2!} + \\frac{x^3}{3!} + ...$$
+
+**Partial Derivatives:**
+$$\\frac{\\partial f}{\\partial x} = \\lim_{h \\to 0} \\frac{f(x+h,y) - f(x,y)}{h}$$
+
 ## Blockquotes
 > This is a blockquote
 > It can span multiple lines
@@ -724,6 +778,7 @@ result = hello_world()
 - **Code blocks** for examples and tutorials
 - **Lists** for organizing information clearly
 - **Blockquotes** for highlighting important notes
+- **Math expressions** for technical content using $...$ for inline and $$...$$ for display
 
 Need help with any specific markdown formatting? Just ask!`;
     }
